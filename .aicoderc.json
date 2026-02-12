@@ -1,0 +1,45 @@
+{
+  "version": "1.0.0",
+  "codeStandards": {
+    "language": "typescript",
+    "framework": "vue3",
+    "buildTool": "vite"
+  },
+  "aiGeneration": {
+    "requireTypeAnnotations": true,
+    "requireDocstrings": true,
+    "requireErrorHandling": true,
+    "enforceSecurity": true,
+    "performanceChecks": true,
+    "accessibilityChecks": true
+  },
+  "qualityGates": {
+    "maxCyclomaticComplexity": 10,
+    "maxNestingDepth": 4,
+    "maxFunctionLines": 50,
+    "maxComponentLines": 200,
+    "minTestCoverage": 70
+  },
+  "vueBestPractices": {
+    "requireComponentNames": true,
+    "requireKeyInList": true,
+    "requirePropsValidation": true,
+    "requireEmitsValidation": true,
+    "preferCompositionApi": true
+  },
+  "typeScript": {
+    "strict": true,
+    "noImplicitAny": true,
+    "noImplicitThis": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true
+  },
+  "securityRules": {
+    "noEval": true,
+    "noInlineScripts": true,
+    "sanitizeUserInput": true,
+    "validateApiResponses": true,
+    "useSecureHeaders": true
+  }
+}

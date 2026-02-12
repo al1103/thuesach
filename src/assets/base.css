@@ -1,0 +1,179 @@
+﻿/* ===== Modern Library UI - Foundations ===== */
+
+@import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap');
+
+:root {
+  color-scheme: light;
+
+  /* Core palette */
+  --bg-app: #f3f6fb;
+  --bg-surface: #ffffff;
+  --bg-surface-soft: #f8fbff;
+  --bg-elevated: #ffffff;
+  --bg-sidebar: #0f172a;
+  --bg-sidebar-soft: #16213d;
+  --bg-overlay: rgba(15, 23, 42, 0.45);
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --text-inverse: #ffffff;
+
+  --brand-50: #eff6ff;
+  --brand-100: #dbeafe;
+  --brand-300: #93c5fd;
+  --brand-500: #3b82f6;
+  --brand-600: #2563eb;
+  --brand-700: #1d4ed8;
+
+  --success-100: #dcfce7;
+  --success-600: #16a34a;
+  --warning-100: #fef3c7;
+  --warning-600: #d97706;
+  --danger-100: #fee2e2;
+  --danger-600: #dc2626;
+  --info-100: #e0f2fe;
+  --info-600: #0284c7;
+
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+
+  /* Surfaces */
+  --card-gradient: linear-gradient(145deg, #ffffff 0%, #f7fbff 100%);
+  --hero-gradient: linear-gradient(135deg, #1d4ed8 0%, #0ea5e9 50%, #22d3ee 100%);
+
+  /* Elevation */
+  --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow-sm: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --shadow-md: 0 10px 25px rgba(15, 23, 42, 0.12);
+  --shadow-lg: 0 18px 40px rgba(15, 23, 42, 0.14);
+  --shadow-focus: 0 0 0 4px rgba(59, 130, 246, 0.2);
+
+  /* Radius */
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+
+  /* Spacing */
+  --space-2xs: 4px;
+  --space-xs: 8px;
+  --space-sm: 12px;
+  --space-md: 16px;
+  --space-lg: 24px;
+  --space-xl: 32px;
+  --space-2xl: 48px;
+
+  /* Layout */
+  --sidebar-width: 284px;
+  --header-height: 84px;
+
+  /* Motion */
+  --ease-standard: cubic-bezier(0.2, 0.9, 0.2, 1);
+  --transition-fast: 140ms var(--ease-standard);
+  --transition-base: 220ms var(--ease-standard);
+}
+
+/* ===== Reset ===== */
+*,
+*::before,
+*::after {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family:
+    'Be Vietnam Pro',
+    'Inter',
+    'Segoe UI',
+    Roboto,
+    sans-serif;
+  background: radial-gradient(circle at 5% 8%, rgba(59, 130, 246, 0.12) 0%, transparent 32%),
+    radial-gradient(circle at 95% 4%, rgba(14, 165, 233, 0.12) 0%, transparent 35%),
+    var(--bg-app);
+  color: var(--text-primary);
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+  border: 0;
+  background: transparent;
+}
+
+input,
+select,
+textarea {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+img {
+  display: block;
+  max-width: 100%;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  color: var(--text-primary);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+h1 {
+  font-size: clamp(1.7rem, 2.4vw, 2.15rem);
+  font-weight: 800;
+}
+
+h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+h3 {
+  font-size: 1.18rem;
+  font-weight: 700;
+}
+
+::selection {
+  background: var(--brand-100);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: #94a3b8;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}

@@ -1,0 +1,141 @@
+{
+  "books": [
+    {
+      "id": 1,
+      "title": "Đắc Nhân Tâm",
+      "author": "Dale Carnegie",
+      "category": "Kỹ năng sống",
+      "quantity": 5,
+      "available": 3
+    },
+    {
+      "id": 2,
+      "title": "Nhà Giả Kim",
+      "author": "Paulo Coelho",
+      "category": "Tiểu thuyết",
+      "quantity": 3,
+      "available": 2
+    },
+    {
+      "id": 3,
+      "title": "Sapiens: Lược Sử Loài Người",
+      "author": "Yuval Noah Harari",
+      "category": "Lịch sử",
+      "quantity": 4,
+      "available": 4
+    },
+    {
+      "id": 4,
+      "title": "Atomic Habits",
+      "author": "James Clear",
+      "category": "Kỹ năng sống",
+      "quantity": 6,
+      "available": 1
+    },
+    {
+      "id": 5,
+      "title": "Think and Grow Rich",
+      "author": "Napoleon Hill",
+      "category": "Kinh doanh",
+      "quantity": 3,
+      "available": 3
+    },
+    {
+      "id": 6,
+      "title": "1984",
+      "author": "George Orwell",
+      "category": "Tiểu thuyết",
+      "quantity": 2,
+      "available": 0
+    }
+  ],
+  "members": [
+    {
+      "id": 1,
+      "name": "Nguyễn Văn A",
+      "email": "nguyenvana@email.com",
+      "phone": "0901234567",
+      "joinDate": "2024-01-15",
+      "isBlacklisted": false,
+      "blacklistUntil": null,
+      "blacklistReason": ""
+    },
+    {
+      "id": 2,
+      "name": "Trần Thị B",
+      "email": "tranthib@email.com",
+      "phone": "0912345678",
+      "joinDate": "2024-02-20",
+      "isBlacklisted": false,
+      "blacklistUntil": null,
+      "blacklistReason": ""
+    },
+    {
+      "id": 3,
+      "name": "Lê Văn C",
+      "email": "levanc@email.com",
+      "phone": "0923456789",
+      "joinDate": "2024-03-10",
+      "isBlacklisted": false,
+      "blacklistUntil": null,
+      "blacklistReason": ""
+    }
+  ],
+  "users": [
+    {
+      "id": 1,
+      "username": "admin",
+      "password": "$2a$10$gnc3khSmSYJpVocxBXqxheGFNyYfH2RHo01bXeCEansTnROKeS.A6",
+      "role": "admin",
+      "name": "Admin"
+    },
+    {
+      "id": 2,
+      "username": "user",
+      "password": "$2a$10$477wUYOVZ78MT314GHz8Bexpka2aW1ZdNRdgC2.4lUbDHcToDy1sq",
+      "role": "user",
+      "name": "Nguyễn Văn User",
+      "memberId": 1
+    }
+  ],
+  "rentals": [
+    {
+      "id": 1,
+      "bookId": 1,
+      "memberId": 1,
+      "borrowDate": "2026-01-20",
+      "dueDate": "2026-02-03",
+      "returnDate": null,
+      "status": "borrowed"
+    },
+    {
+      "id": 2,
+      "bookId": 2,
+      "memberId": 2,
+      "borrowDate": "2026-01-25",
+      "dueDate": "2026-02-08",
+      "returnDate": "2026-02-05",
+      "status": "returned"
+    },
+    {
+      "id": 3,
+      "bookId": 4,
+      "memberId": 3,
+      "borrowDate": "2026-02-01",
+      "dueDate": "2026-02-15",
+      "returnDate": null,
+      "status": "borrowed"
+    }
+  ],
+  "requests": [
+    {
+      "id": 1,
+      "bookId": 3,
+      "userId": 2,
+      "requestDate": "2026-02-05",
+      "status": "pending",
+      "note": "Mượn để làm bài tập"
+    }
+  ],
+  "extensionRequests": []
+}
