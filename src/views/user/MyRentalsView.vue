@@ -5,6 +5,7 @@
  */
 import { computed, ref } from 'vue'
 import { MAX_BORROW_MONTHS, useLibraryStore, type ReminderLevel } from '@/stores/library'
+import PaymentQRModal from '@/components/features/PaymentQRModal.vue'
 
 defineOptions({
   name: 'MyRentalsView',
@@ -13,7 +14,9 @@ defineOptions({
 const store = useLibraryStore()
 
 const showExtensionModal = ref<boolean>(false)
+const showQRModal = ref<boolean>(false)
 const selectedRentalId = ref<number | null>(null)
+const selectedRentalIdForExtension = ref<number | null>(null)
 const extensionDueDate = ref<string>('')
 const extensionNote = ref<string>('')
 
@@ -57,8 +60,8 @@ const myRentals = computed<UserRentalItem[]>(() => {
 })
 
 const selectedRental = computed<UserRentalItem | null>(() => {
-  if (!selectedRentalId.value) return null
-  return myRentals.value.find(rental => rental.id === selectedRentalId.value) || null
+  if (!selectedRentalIdForExtension.value) return null
+  return myRentals.value.find(rental => rental.id === selectedRentalIdForExtension.value) || null
 })
 
 const borrowedCount = computed<number>(() => {
@@ -113,29 +116,34 @@ function hasPendingExtensionRequest(rentalId: number): boolean {
   )
 }
 
+function handleShowQR(rentalId: number): void {
+  selectedRentalId.value = rentalId
+  showQRModal.value = true
+}
+
 function openExtensionModal(rentalId: number): void {
   const rental = myRentals.value.find(item => item.id === rentalId)
   if (!rental) return
-  selectedRentalId.value = rentalId
+  selectedRentalIdForExtension.value = rentalId
   extensionDueDate.value = addDays(rental.dueDate, 1)
   extensionNote.value = ''
   showExtensionModal.value = true
 }
 
 function submitExtensionRequest(): void {
-  if (!selectedRentalId.value || !extensionDueDate.value) {
+  if (!selectedRentalIdForExtension.value || !extensionDueDate.value) {
     store.showToast('Vui lòng chọn hạn gia hạn', 'error')
     return
   }
 
-  const request = store.addExtensionRequest(selectedRentalId.value, extensionDueDate.value, extensionNote.value)
+  const request = store.addExtensionRequest(selectedRentalIdForExtension.value, extensionDueDate.value, extensionNote.value)
   if (!request) {
     store.showToast('Không thể gửi yêu cầu gia hạn', 'error')
     return
   }
 
   showExtensionModal.value = false
-  selectedRentalId.value = null
+  selectedRentalIdForExtension.value = null
   extensionDueDate.value = ''
   extensionNote.value = ''
   store.showToast('Đã gửi yêu cầu gia hạn')
@@ -243,15 +251,20 @@ function formatDate(date: Date): string {
                 </span>
               </td>
               <td>
-                <button
-                  v-if="rental.status === 'borrowed' && !hasPendingExtensionRequest(rental.id)"
-                  class="btn btn-sm btn-secondary"
-                  @click="openExtensionModal(rental.id)"
-                >
-                  Gia hạn
-                </button>
-                <span v-else-if="hasPendingExtensionRequest(rental.id)" class="badge badge-warning">Đang chờ duyệt</span>
-                <span v-else class="text-muted">—</span>
+                <div class="action-group">
+                  <button
+                    v-if="rental.status === 'borrowed' && !hasPendingExtensionRequest(rental.id)"
+                    class="btn btn-sm btn-secondary"
+                    @click="openExtensionModal(rental.id)"
+                  >
+                    Gia hạn
+                  </button>
+                  <span v-else-if="hasPendingExtensionRequest(rental.id)" class="badge badge-warning">Đang chờ duyệt</span>
+                  <button v-if="rental.lateFee > 0" class="btn btn-sm btn-info" @click="handleShowQR(rental.id)">
+                    QR
+                  </button>
+                  <span v-if="rental.status === 'returned' && rental.lateFee === 0" class="text-muted">—</span>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -287,6 +300,8 @@ function formatDate(date: Date): string {
         </form>
       </div>
     </div>
+
+    <PaymentQRModal v-if="showQRModal && selectedRentalId" :rental-id="selectedRentalId" @close="showQRModal = false" />
   </div>
 </template>
 
@@ -318,6 +333,11 @@ function formatDate(date: Date): string {
 
 .extension-meta p + p {
   margin-top: 4px;
+}
+
+.action-group {
+  display: flex;
+  gap: 4px;
 }
 
 @media (max-width: 1024px) {

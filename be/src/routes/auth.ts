@@ -5,7 +5,7 @@ import { AuthRequest, authMiddleware, generateToken } from '../middleware/auth'
 
 const router = Router()
 
-router.post('/login', (req: AuthRequest, res: Response): void => {
+router.post('/login', async (req: AuthRequest, res: Response): Promise<void> => {
   const { username, password } = req.body
 
   if (!username || !password) {
@@ -13,7 +13,7 @@ router.post('/login', (req: AuthRequest, res: Response): void => {
     return
   }
 
-  const user = db.findUserByUsername(username)
+  const user = await db.findUserByUsername(username)
   if (!user) {
     res.status(401).json({ error: 'Sai tên đăng nhập hoặc mật khẩu' })
     return
@@ -30,7 +30,7 @@ router.post('/login', (req: AuthRequest, res: Response): void => {
   res.json({ user: userWithoutPassword, token })
 })
 
-router.post('/register', (req: AuthRequest, res: Response): void => {
+router.post('/register', async (req: AuthRequest, res: Response): Promise<void> => {
   const { username, password, name, email, phone } = req.body
 
   if (!username || !password || !name) {
@@ -38,7 +38,7 @@ router.post('/register', (req: AuthRequest, res: Response): void => {
     return
   }
 
-  if (db.findUserByUsername(username)) {
+  if (await db.findUserByUsername(username)) {
     res.status(400).json({ error: 'Tên đăng nhập đã tồn tại' })
     return
   }
@@ -46,7 +46,7 @@ router.post('/register', (req: AuthRequest, res: Response): void => {
   const hashedPassword = bcrypt.hashSync(password, 10)
   const today = new Date().toISOString().split('T')[0] || ''
 
-  const member = db.addMember({
+  const member = await db.addMember({
     name,
     email: email || '',
     phone: phone || '',
@@ -56,7 +56,7 @@ router.post('/register', (req: AuthRequest, res: Response): void => {
     blacklistReason: '',
   })
 
-  const user = db.addUser({
+  const user = await db.addUser({
     username,
     password: hashedPassword,
     role: 'user',
@@ -69,8 +69,8 @@ router.post('/register', (req: AuthRequest, res: Response): void => {
   res.status(201).json({ user: userWithoutPassword, token })
 })
 
-router.get('/me', authMiddleware, (req: AuthRequest, res: Response): void => {
-  const user = db.findUser(req.user!.userId)
+router.get('/me', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = await db.findUser(req.user!.userId)
   if (!user) {
     res.status(404).json({ error: 'Không tìm thấy user' })
     return

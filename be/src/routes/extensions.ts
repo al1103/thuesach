@@ -22,42 +22,50 @@ function isMemberBlacklisted(member: Member): boolean {
   return member.blacklistUntil >= getTodayDate()
 }
 
-router.get('/', authMiddleware, adminMiddleware, (_req: AuthRequest, res: Response): void => {
-  const result = db.extensionRequests
-    .map(e => {
-      const rental = db.findRental(e.rentalId)
-      const book = rental ? db.findBook(rental.bookId) : null
-      const user = db.findUser(e.userId)
+router.get(
+  '/',
+  authMiddleware,
+  adminMiddleware,
+  async (_req: AuthRequest, res: Response): Promise<void> => {
+    const extensionRequests = await db.getExtensionRequests()
+    const result = await Promise.all(
+      extensionRequests.map(async e => {
+        const rental = await db.findRental(e.rentalId)
+        const book = rental ? await db.findBook(rental.bookId) : null
+        const user = await db.findUser(e.userId)
+        return {
+          ...e,
+          bookId: rental?.bookId || 0,
+          currentDueDate: rental?.dueDate || '',
+          bookTitle: book?.title || 'N/A',
+          userName: user?.name || 'N/A',
+        }
+      })
+    )
+    res.json(result.reverse())
+  }
+)
+
+router.get('/my', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  const extensionRequests = await db.getExtensionRequests()
+  const userExtensions = extensionRequests.filter(e => e.userId === req.user!.userId)
+
+  const result = await Promise.all(
+    userExtensions.map(async e => {
+      const rental = await db.findRental(e.rentalId)
+      const book = rental ? await db.findBook(rental.bookId) : null
       return {
         ...e,
         bookId: rental?.bookId || 0,
         currentDueDate: rental?.dueDate || '',
         bookTitle: book?.title || 'N/A',
-        userName: user?.name || 'N/A',
       }
     })
-    .reverse()
-  res.json(result)
+  )
+  res.json(result.reverse())
 })
 
-router.get('/my', authMiddleware, (req: AuthRequest, res: Response): void => {
-  const result = db.extensionRequests
-    .filter(e => e.userId === req.user!.userId)
-    .map(e => {
-      const rental = db.findRental(e.rentalId)
-      const book = rental ? db.findBook(rental.bookId) : null
-      return {
-        ...e,
-        bookId: rental?.bookId || 0,
-        currentDueDate: rental?.dueDate || '',
-        bookTitle: book?.title || 'N/A',
-      }
-    })
-    .reverse()
-  res.json(result)
-})
-
-router.post('/', authMiddleware, (req: AuthRequest, res: Response): void => {
+router.post('/', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
   const { rentalId, requestedDueDate, note } = req.body
 
   if (!rentalId || !requestedDueDate) {
@@ -65,16 +73,16 @@ router.post('/', authMiddleware, (req: AuthRequest, res: Response): void => {
     return
   }
 
-  const user = db.findUser(req.user!.userId)
+  const user = await db.findUser(req.user!.userId)
   if (user?.memberId) {
-    const member = db.findMember(user.memberId)
+    const member = await db.findMember(user.memberId)
     if (member && isMemberBlacklisted(member)) {
       res.status(400).json({ error: 'Bạn đang bị blacklist, không thể tạo yêu cầu' })
       return
     }
   }
 
-  const rental = db.findRental(rentalId)
+  const rental = await db.findRental(rentalId)
   if (!rental || rental.status !== 'borrowed') {
     res.status(400).json({ error: 'Không tìm thấy phiếu mượn hoặc sách đã trả' })
     return
@@ -86,7 +94,8 @@ router.post('/', authMiddleware, (req: AuthRequest, res: Response): void => {
     return
   }
 
-  const existingPending = db.extensionRequests.find(
+  const extensionRequests = await db.getExtensionRequests()
+  const existingPending = extensionRequests.find(
     e => e.rentalId === rentalId && e.userId === req.user!.userId && e.status === 'pending'
   )
   if (existingPending) {
@@ -94,7 +103,7 @@ router.post('/', authMiddleware, (req: AuthRequest, res: Response): void => {
     return
   }
 
-  const extension = db.addExtensionRequest({
+  const extension = await db.addExtensionRequest({
     rentalId,
     userId: req.user!.userId,
     requestDate: getTodayDate(),
@@ -111,8 +120,8 @@ router.put(
   '/:id/approve',
   authMiddleware,
   adminMiddleware,
-  (req: AuthRequest, res: Response): void => {
-    const extension = db.findExtensionRequest(Number(req.params.id))
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const extension = await db.findExtensionRequest(Number(req.params.id))
     if (!extension) {
       res.status(404).json({ error: 'Không tìm thấy yêu cầu gia hạn' })
       return
@@ -123,7 +132,7 @@ router.put(
       return
     }
 
-    const rental = db.findRental(extension.rentalId)
+    const rental = await db.findRental(extension.rentalId)
     if (!rental || rental.status !== 'borrowed') {
       res.status(400).json({ error: 'Phiếu mượn không hợp lệ' })
       return
@@ -135,8 +144,11 @@ router.put(
       return
     }
 
-    db.updateRental(extension.rentalId, { dueDate: extension.requestedDueDate })
-    db.updateExtensionRequest(extension.id, { status: 'approved', reviewedDate: getTodayDate() })
+    await db.updateRental(extension.rentalId, { dueDate: extension.requestedDueDate })
+    await db.updateExtensionRequest(extension.id, {
+      status: 'approved',
+      reviewedDate: getTodayDate(),
+    })
 
     res.json({ message: 'Đã duyệt gia hạn' })
   }
@@ -146,8 +158,8 @@ router.put(
   '/:id/reject',
   authMiddleware,
   adminMiddleware,
-  (req: AuthRequest, res: Response): void => {
-    const extension = db.findExtensionRequest(Number(req.params.id))
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const extension = await db.findExtensionRequest(Number(req.params.id))
     if (!extension) {
       res.status(404).json({ error: 'Không tìm thấy yêu cầu gia hạn' })
       return
@@ -158,7 +170,10 @@ router.put(
       return
     }
 
-    db.updateExtensionRequest(extension.id, { status: 'rejected', reviewedDate: getTodayDate() })
+    await db.updateExtensionRequest(extension.id, {
+      status: 'rejected',
+      reviewedDate: getTodayDate(),
+    })
     res.json({ message: 'Đã từ chối gia hạn' })
   }
 )

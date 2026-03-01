@@ -1,399 +1,381 @@
-import fs from 'fs'
-import path from 'path'
-import bcrypt from 'bcryptjs'
+import db from './db'
 import { Book, Member, Rental, Request, ExtensionRequest, User } from '../models/types'
 
-interface Database {
-  books: Book[]
-  members: Member[]
-  rentals: Rental[]
-  requests: Request[]
-  extensionRequests: ExtensionRequest[]
-  users: User[]
-}
-
-const dbPath = path.join(__dirname, '../../data/database.json')
-
-function ensureDataDir(): void {
-  const dataDir = path.dirname(dbPath)
-  if (!fs.existsSync(dataDir)) {
-    fs.mkdirSync(dataDir, { recursive: true })
-  }
-}
-
-function getDefaultData(): Database {
-  const hashedAdmin = bcrypt.hashSync('admin123', 10)
-  const hashedUser = bcrypt.hashSync('user123', 10)
-
-  return {
-    books: [
-      {
-        id: 1,
-        title: 'Đắc Nhân Tâm',
-        author: 'Dale Carnegie',
-        category: 'Kỹ năng sống',
-        quantity: 5,
-        available: 3,
-      },
-      {
-        id: 2,
-        title: 'Nhà Giả Kim',
-        author: 'Paulo Coelho',
-        category: 'Tiểu thuyết',
-        quantity: 3,
-        available: 2,
-      },
-      {
-        id: 3,
-        title: 'Sapiens: Lược Sử Loài Người',
-        author: 'Yuval Noah Harari',
-        category: 'Lịch sử',
-        quantity: 4,
-        available: 4,
-      },
-      {
-        id: 4,
-        title: 'Atomic Habits',
-        author: 'James Clear',
-        category: 'Kỹ năng sống',
-        quantity: 6,
-        available: 1,
-      },
-      {
-        id: 5,
-        title: 'Think and Grow Rich',
-        author: 'Napoleon Hill',
-        category: 'Kinh doanh',
-        quantity: 3,
-        available: 3,
-      },
-      {
-        id: 6,
-        title: '1984',
-        author: 'George Orwell',
-        category: 'Tiểu thuyết',
-        quantity: 2,
-        available: 0,
-      },
-    ],
-    members: [
-      {
-        id: 1,
-        name: 'Nguyễn Văn A',
-        email: 'nguyenvana@email.com',
-        phone: '0901234567',
-        joinDate: '2024-01-15',
-        isBlacklisted: false,
-        blacklistUntil: null,
-        blacklistReason: '',
-      },
-      {
-        id: 2,
-        name: 'Trần Thị B',
-        email: 'tranthib@email.com',
-        phone: '0912345678',
-        joinDate: '2024-02-20',
-        isBlacklisted: false,
-        blacklistUntil: null,
-        blacklistReason: '',
-      },
-      {
-        id: 3,
-        name: 'Lê Văn C',
-        email: 'levanc@email.com',
-        phone: '0923456789',
-        joinDate: '2024-03-10',
-        isBlacklisted: false,
-        blacklistUntil: null,
-        blacklistReason: '',
-      },
-    ],
-    users: [
-      { id: 1, username: 'admin', password: hashedAdmin, role: 'admin', name: 'Admin' },
-      {
-        id: 2,
-        username: 'user',
-        password: hashedUser,
-        role: 'user',
-        name: 'Nguyễn Văn User',
-        memberId: 1,
-      },
-    ],
-    rentals: [
-      {
-        id: 1,
-        bookId: 1,
-        memberId: 1,
-        borrowDate: '2026-01-20',
-        dueDate: '2026-02-03',
-        returnDate: null,
-        status: 'borrowed',
-      },
-      {
-        id: 2,
-        bookId: 2,
-        memberId: 2,
-        borrowDate: '2026-01-25',
-        dueDate: '2026-02-08',
-        returnDate: '2026-02-05',
-        status: 'returned',
-      },
-      {
-        id: 3,
-        bookId: 4,
-        memberId: 3,
-        borrowDate: '2026-02-01',
-        dueDate: '2026-02-15',
-        returnDate: null,
-        status: 'borrowed',
-      },
-    ],
-    requests: [
-      {
-        id: 1,
-        bookId: 3,
-        userId: 2,
-        requestDate: '2026-02-05',
-        status: 'pending',
-        note: 'Mượn để làm bài tập',
-      },
-    ],
-    extensionRequests: [],
-  }
-}
-
-function loadDatabase(): Database {
-  ensureDataDir()
-  if (!fs.existsSync(dbPath)) {
-    const defaultData = getDefaultData()
-    fs.writeFileSync(dbPath, JSON.stringify(defaultData, null, 2), 'utf8')
-    return defaultData
-  }
-  const data = fs.readFileSync(dbPath, 'utf8')
-  return JSON.parse(data)
-}
-
-function saveDatabase(db: Database): void {
-  ensureDataDir()
-  fs.writeFileSync(dbPath, JSON.stringify(db, null, 2), 'utf8')
-}
-
 class DatabaseManager {
-  private data: Database
-
-  constructor() {
-    this.data = loadDatabase()
+  // Books
+  async getBooks(): Promise<Book[]> {
+    const res = await db.query('SELECT * FROM books ORDER BY id')
+    return res.rows
   }
 
-  save(): void {
-    saveDatabase(this.data)
+  async findBook(id: number): Promise<Book | undefined> {
+    const res = await db.query('SELECT * FROM books WHERE id = $1', [id])
+    return res.rows[0]
   }
 
-  get books(): Book[] {
-    return this.data.books
-  }
-  set books(value: Book[]) {
-    this.data.books = value
-    this.save()
-  }
-
-  get members(): Member[] {
-    return this.data.members
-  }
-  set members(value: Member[]) {
-    this.data.members = value
-    this.save()
+  async addBook(book: Omit<Book, 'id'>): Promise<Book> {
+    const res = await db.query(
+      'INSERT INTO books (title, author, category, quantity, available) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [book.title, book.author, book.category, book.quantity, book.available]
+    )
+    return res.rows[0]
   }
 
-  get users(): User[] {
-    return this.data.users
-  }
-  set users(value: User[]) {
-    this.data.users = value
-    this.save()
+  async updateBook(id: number, data: Partial<Book>): Promise<Book | undefined> {
+    const existing = await this.findBook(id)
+    if (!existing) return undefined
+
+    const updated = { ...existing, ...data }
+    const res = await db.query(
+      'UPDATE books SET title = $1, author = $2, category = $3, quantity = $4, available = $5 WHERE id = $6 RETURNING *',
+      [updated.title, updated.author, updated.category, updated.quantity, updated.available, id]
+    )
+    return res.rows[0]
   }
 
-  get rentals(): Rental[] {
-    return this.data.rentals
-  }
-  set rentals(value: Rental[]) {
-    this.data.rentals = value
-    this.save()
+  async deleteBook(id: number): Promise<boolean> {
+    const res = await db.query('DELETE FROM books WHERE id = $1', [id])
+    return (res.rowCount ?? 0) > 0
   }
 
-  get requests(): Request[] {
-    return this.data.requests
-  }
-  set requests(value: Request[]) {
-    this.data.requests = value
-    this.save()
-  }
-
-  get extensionRequests(): ExtensionRequest[] {
-    return this.data.extensionRequests
-  }
-  set extensionRequests(value: ExtensionRequest[]) {
-    this.data.extensionRequests = value
-    this.save()
+  // Members
+  async getMembers(): Promise<Member[]> {
+    const res = await db.query('SELECT * FROM members ORDER BY id')
+    return res.rows.map(m => ({
+      ...m,
+      isBlacklisted: m.is_blacklisted,
+      blacklistUntil: m.blacklist_until,
+      blacklistReason: m.blacklist_reason,
+      joinDate: m.join_date,
+    }))
   }
 
-  findBook(id: number): Book | undefined {
-    return this.data.books.find(b => b.id === id)
+  async findMember(id: number): Promise<Member | undefined> {
+    const res = await db.query('SELECT * FROM members WHERE id = $1', [id])
+    const m = res.rows[0]
+    if (!m) return undefined
+    return {
+      ...m,
+      isBlacklisted: m.is_blacklisted,
+      blacklistUntil: m.blacklist_until,
+      blacklistReason: m.blacklist_reason,
+      joinDate: m.join_date,
+    }
   }
 
-  findMember(id: number): Member | undefined {
-    return this.data.members.find(m => m.id === id)
+  async addMember(member: Omit<Member, 'id'>): Promise<Member> {
+    const res = await db.query(
+      'INSERT INTO members (name, email, phone, join_date, is_blacklisted, blacklist_until, blacklist_reason) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [
+        member.name,
+        member.email,
+        member.phone,
+        member.joinDate,
+        member.isBlacklisted,
+        member.blacklistUntil,
+        member.blacklistReason,
+      ]
+    )
+    const m = res.rows[0]
+    return {
+      ...m,
+      isBlacklisted: m.is_blacklisted,
+      blacklistUntil: m.blacklist_until,
+      blacklistReason: m.blacklist_reason,
+      joinDate: m.join_date,
+    }
   }
 
-  findUser(id: number): User | undefined {
-    return this.data.users.find(u => u.id === id)
+  async updateMember(id: number, data: Partial<Member>): Promise<Member | undefined> {
+    const existing = await this.findMember(id)
+    if (!existing) return undefined
+
+    const updated = { ...existing, ...data }
+    const res = await db.query(
+      'UPDATE members SET name = $1, email = $2, phone = $3, join_date = $4, is_blacklisted = $5, blacklist_until = $6, blacklist_reason = $7 WHERE id = $8 RETURNING *',
+      [
+        updated.name,
+        updated.email,
+        updated.phone,
+        updated.joinDate,
+        updated.isBlacklisted,
+        updated.blacklistUntil,
+        updated.blacklistReason,
+        id,
+      ]
+    )
+    const m = res.rows[0]
+    return {
+      ...m,
+      isBlacklisted: m.is_blacklisted,
+      blacklistUntil: m.blacklist_until,
+      blacklistReason: m.blacklist_reason,
+      joinDate: m.join_date,
+    }
   }
 
-  findUserByUsername(username: string): User | undefined {
-    return this.data.users.find(u => u.username === username)
+  async deleteMember(id: number): Promise<boolean> {
+    const res = await db.query('DELETE FROM members WHERE id = $1', [id])
+    return (res.rowCount ?? 0) > 0
   }
 
-  findRental(id: number): Rental | undefined {
-    return this.data.rentals.find(r => r.id === id)
+  // Users
+  async getUsers(): Promise<User[]> {
+    const res = await db.query('SELECT * FROM users ORDER BY id')
+    return res.rows.map(u => ({
+      ...u,
+      memberId: u.member_id,
+    }))
   }
 
-  findRequest(id: number): Request | undefined {
-    return this.data.requests.find(r => r.id === id)
+  async findUser(id: number): Promise<User | undefined> {
+    const res = await db.query('SELECT * FROM users WHERE id = $1', [id])
+    const u = res.rows[0]
+    if (!u) return undefined
+    return {
+      ...u,
+      memberId: u.member_id,
+    }
   }
 
-  findExtensionRequest(id: number): ExtensionRequest | undefined {
-    return this.data.extensionRequests.find(e => e.id === id)
+  async findUserByUsername(username: string): Promise<User | undefined> {
+    const res = await db.query('SELECT * FROM users WHERE username = $1', [username])
+    const u = res.rows[0]
+    if (!u) return undefined
+    return {
+      ...u,
+      memberId: u.member_id,
+    }
   }
 
-  nextBookId(): number {
-    return Math.max(0, ...this.data.books.map(b => b.id)) + 1
+  async addUser(user: Omit<User, 'id'>): Promise<User> {
+    const res = await db.query(
+      'INSERT INTO users (username, password, role, name, member_id) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [user.username, user.password, user.role, user.name, user.memberId]
+    )
+    const u = res.rows[0]
+    return {
+      ...u,
+      memberId: u.member_id,
+    }
   }
 
-  nextMemberId(): number {
-    return Math.max(0, ...this.data.members.map(m => m.id)) + 1
+  // Rentals
+  async getRentals(): Promise<Rental[]> {
+    const res = await db.query('SELECT * FROM rentals ORDER BY id')
+    return res.rows.map(r => ({
+      ...r,
+      bookId: r.book_id,
+      memberId: r.member_id,
+      borrowDate: r.borrow_date,
+      dueDate: r.due_date,
+      returnDate: r.return_date,
+    }))
   }
 
-  nextUserId(): number {
-    return Math.max(0, ...this.data.users.map(u => u.id)) + 1
+  async findRental(id: number): Promise<Rental | undefined> {
+    const res = await db.query('SELECT * FROM rentals WHERE id = $1', [id])
+    const r = res.rows[0]
+    if (!r) return undefined
+    return {
+      ...r,
+      bookId: r.book_id,
+      memberId: r.member_id,
+      borrowDate: r.borrow_date,
+      dueDate: r.due_date,
+      returnDate: r.return_date,
+    }
   }
 
-  nextRentalId(): number {
-    return Math.max(0, ...this.data.rentals.map(r => r.id)) + 1
+  async addRental(rental: Omit<Rental, 'id'>): Promise<Rental> {
+    const res = await db.query(
+      'INSERT INTO rentals (book_id, member_id, borrow_date, due_date, return_date, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [
+        rental.bookId,
+        rental.memberId,
+        rental.borrowDate,
+        rental.dueDate,
+        rental.returnDate,
+        rental.status,
+      ]
+    )
+    const r = res.rows[0]
+    return {
+      ...r,
+      bookId: r.book_id,
+      memberId: r.member_id,
+      borrowDate: r.borrow_date,
+      dueDate: r.due_date,
+      returnDate: r.return_date,
+    }
   }
 
-  nextRequestId(): number {
-    return Math.max(0, ...this.data.requests.map(r => r.id)) + 1
+  async updateRental(id: number, data: Partial<Rental>): Promise<Rental | undefined> {
+    const existing = await this.findRental(id)
+    if (!existing) return undefined
+
+    const updated = { ...existing, ...data }
+    const res = await db.query(
+      'UPDATE rentals SET book_id = $1, member_id = $2, borrow_date = $3, due_date = $4, return_date = $5, status = $6 WHERE id = $7 RETURNING *',
+      [
+        updated.bookId,
+        updated.memberId,
+        updated.borrowDate,
+        updated.dueDate,
+        updated.returnDate,
+        updated.status,
+        id,
+      ]
+    )
+    const r = res.rows[0]
+    return {
+      ...r,
+      bookId: r.book_id,
+      memberId: r.member_id,
+      borrowDate: r.borrow_date,
+      dueDate: r.due_date,
+      returnDate: r.return_date,
+    }
   }
 
-  nextExtensionRequestId(): number {
-    return Math.max(0, ...this.data.extensionRequests.map(e => e.id)) + 1
+  // Requests
+  async getRequests(): Promise<Request[]> {
+    const res = await db.query('SELECT * FROM requests ORDER BY id')
+    return res.rows.map(r => ({
+      ...r,
+      bookId: r.book_id,
+      userId: r.user_id,
+      requestDate: r.request_date,
+    }))
   }
 
-  updateBook(id: number, data: Partial<Book>): Book | undefined {
-    const index = this.data.books.findIndex(b => b.id === id)
-    if (index === -1) return undefined
-    this.data.books[index] = { ...this.data.books[index]!, ...data }
-    this.save()
-    return this.data.books[index]
+  async findRequest(id: number): Promise<Request | undefined> {
+    const res = await db.query('SELECT * FROM requests WHERE id = $1', [id])
+    const r = res.rows[0]
+    if (!r) return undefined
+    return {
+      ...r,
+      bookId: r.book_id,
+      userId: r.user_id,
+      requestDate: r.request_date,
+    }
   }
 
-  updateMember(id: number, data: Partial<Member>): Member | undefined {
-    const index = this.data.members.findIndex(m => m.id === id)
-    if (index === -1) return undefined
-    this.data.members[index] = { ...this.data.members[index]!, ...data }
-    this.save()
-    return this.data.members[index]
+  async addRequest(request: Omit<Request, 'id'>): Promise<Request> {
+    const res = await db.query(
+      'INSERT INTO requests (book_id, user_id, request_date, status, note) VALUES ($1, $2, $3, $4, $5) RETURNING *',
+      [request.bookId, request.userId, request.requestDate, request.status, request.note]
+    )
+    const r = res.rows[0]
+    return {
+      ...r,
+      bookId: r.book_id,
+      userId: r.user_id,
+      requestDate: r.request_date,
+    }
   }
 
-  updateRental(id: number, data: Partial<Rental>): Rental | undefined {
-    const index = this.data.rentals.findIndex(r => r.id === id)
-    if (index === -1) return undefined
-    this.data.rentals[index] = { ...this.data.rentals[index]!, ...data }
-    this.save()
-    return this.data.rentals[index]
+  async updateRequest(id: number, data: Partial<Request>): Promise<Request | undefined> {
+    const existing = await this.findRequest(id)
+    if (!existing) return undefined
+
+    const updated = { ...existing, ...data }
+    const res = await db.query(
+      'UPDATE requests SET book_id = $1, user_id = $2, request_date = $3, status = $4, note = $5 WHERE id = $6 RETURNING *',
+      [updated.bookId, updated.userId, updated.requestDate, updated.status, updated.note, id]
+    )
+    const r = res.rows[0]
+    return {
+      ...r,
+      bookId: r.book_id,
+      userId: r.user_id,
+      requestDate: r.request_date,
+    }
   }
 
-  updateRequest(id: number, data: Partial<Request>): Request | undefined {
-    const index = this.data.requests.findIndex(r => r.id === id)
-    if (index === -1) return undefined
-    this.data.requests[index] = { ...this.data.requests[index]!, ...data }
-    this.save()
-    return this.data.requests[index]
+  // Extension Requests
+  async getExtensionRequests(): Promise<ExtensionRequest[]> {
+    const res = await db.query('SELECT * FROM extension_requests ORDER BY id')
+    return res.rows.map(e => ({
+      ...e,
+      rentalId: e.rental_id,
+      userId: e.user_id,
+      requestDate: e.request_date,
+      requestedDueDate: e.requested_due_date,
+      reviewedDate: e.reviewed_date,
+    }))
   }
 
-  updateExtensionRequest(
+  async findExtensionRequest(id: number): Promise<ExtensionRequest | undefined> {
+    const res = await db.query('SELECT * FROM extension_requests WHERE id = $1', [id])
+    const e = res.rows[0]
+    if (!e) return undefined
+    return {
+      ...e,
+      rentalId: e.rental_id,
+      userId: e.user_id,
+      requestDate: e.request_date,
+      requestedDueDate: e.requested_due_date,
+      reviewedDate: e.reviewed_date,
+    }
+  }
+
+  async addExtensionRequest(ext: Omit<ExtensionRequest, 'id'>): Promise<ExtensionRequest> {
+    const res = await db.query(
+      'INSERT INTO extension_requests (rental_id, user_id, request_date, requested_due_date, status, note, reviewed_date) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *',
+      [
+        ext.rentalId,
+        ext.userId,
+        ext.requestDate,
+        ext.requestedDueDate,
+        ext.status,
+        ext.note,
+        ext.reviewedDate,
+      ]
+    )
+    const e = res.rows[0]
+    return {
+      ...e,
+      rentalId: e.rental_id,
+      userId: e.user_id,
+      requestDate: e.request_date,
+      requestedDueDate: e.requested_due_date,
+      reviewedDate: e.reviewed_date,
+    }
+  }
+
+  async updateExtensionRequest(
     id: number,
     data: Partial<ExtensionRequest>
-  ): ExtensionRequest | undefined {
-    const index = this.data.extensionRequests.findIndex(e => e.id === id)
-    if (index === -1) return undefined
-    this.data.extensionRequests[index] = { ...this.data.extensionRequests[index]!, ...data }
-    this.save()
-    return this.data.extensionRequests[index]
-  }
+  ): Promise<ExtensionRequest | undefined> {
+    const existing = await this.findExtensionRequest(id)
+    if (!existing) return undefined
 
-  addBook(book: Omit<Book, 'id'>): Book {
-    const newBook: Book = { ...book, id: this.nextBookId() }
-    this.data.books.push(newBook)
-    this.save()
-    return newBook
-  }
-
-  addMember(member: Omit<Member, 'id'>): Member {
-    const newMember: Member = { ...member, id: this.nextMemberId() }
-    this.data.members.push(newMember)
-    this.save()
-    return newMember
-  }
-
-  addUser(user: Omit<User, 'id'>): User {
-    const newUser: User = { ...user, id: this.nextUserId() }
-    this.data.users.push(newUser)
-    this.save()
-    return newUser
-  }
-
-  addRental(rental: Omit<Rental, 'id'>): Rental {
-    const newRental: Rental = { ...rental, id: this.nextRentalId() }
-    this.data.rentals.push(newRental)
-    this.save()
-    return newRental
-  }
-
-  addRequest(request: Omit<Request, 'id'>): Request {
-    const newRequest: Request = { ...request, id: this.nextRequestId() }
-    this.data.requests.push(newRequest)
-    this.save()
-    return newRequest
-  }
-
-  addExtensionRequest(ext: Omit<ExtensionRequest, 'id'>): ExtensionRequest {
-    const newExt: ExtensionRequest = { ...ext, id: this.nextExtensionRequestId() }
-    this.data.extensionRequests.push(newExt)
-    this.save()
-    return newExt
-  }
-
-  deleteBook(id: number): boolean {
-    const len = this.data.books.length
-    this.data.books = this.data.books.filter(b => b.id !== id)
-    if (this.data.books.length < len) {
-      this.save()
-      return true
+    const updated = { ...existing, ...data }
+    const res = await db.query(
+      'UPDATE extension_requests SET rental_id = $1, user_id = $2, request_date = $3, requested_due_date = $4, status = $5, note = $6, reviewed_date = $7 WHERE id = $8 RETURNING *',
+      [
+        updated.rentalId,
+        updated.userId,
+        updated.requestDate,
+        updated.requestedDueDate,
+        updated.status,
+        updated.note,
+        updated.reviewedDate,
+        id,
+      ]
+    )
+    const e = res.rows[0]
+    return {
+      ...e,
+      rentalId: e.rental_id,
+      userId: e.user_id,
+      requestDate: e.request_date,
+      requestedDueDate: e.requested_due_date,
+      reviewedDate: e.reviewed_date,
     }
-    return false
-  }
-
-  deleteMember(id: number): boolean {
-    const len = this.data.members.length
-    this.data.members = this.data.members.filter(m => m.id !== id)
-    if (this.data.members.length < len) {
-      this.save()
-      return true
-    }
-    return false
   }
 }
 
-const db = new DatabaseManager()
-export default db
+const databaseManager = new DatabaseManager()
+export default databaseManager

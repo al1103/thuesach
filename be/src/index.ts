@@ -1,13 +1,9 @@
 import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
-import path from 'path'
-import fs from 'fs'
+import dotenv from 'dotenv'
 
-const dataDir = path.join(__dirname, '../data')
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true })
-}
+dotenv.config()
 
 import authRoutes from './routes/auth'
 import booksRoutes from './routes/books'

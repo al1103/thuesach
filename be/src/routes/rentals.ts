@@ -3,6 +3,8 @@ import db from '../db/database'
 import { AuthRequest, authMiddleware, adminMiddleware } from '../middleware/auth'
 import { Rental, Member, DAILY_LATE_FEE, MAX_BORROW_MONTHS } from '../models/types'
 
+import { generateQRUrl } from '../utils/payment'
+
 const router = Router()
 
 function getTodayDate(): string {
@@ -29,34 +31,42 @@ function isMemberBlacklisted(member: Member): boolean {
   return member.blacklistUntil >= getTodayDate()
 }
 
-router.get('/', authMiddleware, adminMiddleware, (_req: AuthRequest, res: Response): void => {
-  const result = db.rentals
-    .map(r => {
-      const book = db.findBook(r.bookId)
-      const member = db.findMember(r.memberId)
-      return {
-        ...r,
-        bookTitle: book?.title || 'N/A',
-        memberName: member?.name || 'N/A',
-        lateDays: getLateDays(r),
-        lateFee: getLateDays(r) * DAILY_LATE_FEE,
-      }
-    })
-    .reverse()
-  res.json(result)
-})
+router.get(
+  '/',
+  authMiddleware,
+  adminMiddleware,
+  async (_req: AuthRequest, res: Response): Promise<void> => {
+    const rentals = await db.getRentals()
+    const result = await Promise.all(
+      rentals.map(async r => {
+        const book = await db.findBook(r.bookId)
+        const member = await db.findMember(r.memberId)
+        return {
+          ...r,
+          bookTitle: book?.title || 'N/A',
+          memberName: member?.name || 'N/A',
+          lateDays: getLateDays(r),
+          lateFee: getLateDays(r) * DAILY_LATE_FEE,
+        }
+      })
+    )
+    res.json(result.reverse())
+  }
+)
 
-router.get('/my', authMiddleware, (req: AuthRequest, res: Response): void => {
-  const user = db.findUser(req.user!.userId)
+router.get('/my', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  const user = await db.findUser(req.user!.userId)
   if (!user?.memberId) {
     res.json([])
     return
   }
 
-  const result = db.rentals
-    .filter(r => r.memberId === user.memberId)
-    .map(r => {
-      const book = db.findBook(r.bookId)
+  const rentals = await db.getRentals()
+  const userRentals = rentals.filter(r => r.memberId === user.memberId)
+
+  const result = await Promise.all(
+    userRentals.map(async r => {
+      const book = await db.findBook(r.bookId)
       return {
         ...r,
         bookTitle: book?.title || 'N/A',
@@ -65,64 +75,102 @@ router.get('/my', authMiddleware, (req: AuthRequest, res: Response): void => {
         lateFee: getLateDays(r) * DAILY_LATE_FEE,
       }
     })
-    .reverse()
+  )
 
-  res.json(result)
+  res.json(result.reverse())
 })
 
-router.post('/', authMiddleware, adminMiddleware, (req: AuthRequest, res: Response): void => {
-  const { bookId, memberId, dueDate } = req.body
-
-  if (!bookId || !memberId) {
-    res.status(400).json({ error: 'Thiếu thông tin mượn sách' })
+router.get('/:id/qr', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  const rental = await db.findRental(Number(req.params.id))
+  if (!rental) {
+    res.status(404).json({ error: 'Không tìm thấy phiếu mượn' })
     return
   }
 
-  const member = db.findMember(memberId)
-  if (!member) {
-    res.status(400).json({ error: 'Không tìm thấy thành viên' })
+  const user = await db.findUser(req.user!.userId)
+  if (user?.role !== 'admin' && user?.memberId !== rental.memberId) {
+    res.status(403).json({ error: 'Không có quyền truy cập' })
     return
   }
 
-  if (isMemberBlacklisted(member)) {
-    res.status(400).json({ error: 'Thành viên đang bị blacklist' })
+  const lateDays = getLateDays(rental)
+  const lateFee = lateDays * DAILY_LATE_FEE
+
+  if (lateFee <= 0) {
+    res.status(400).json({ error: 'Phiếu mượn không có tiền phạt' })
     return
   }
 
-  const book = db.findBook(bookId)
-  if (!book || book.available <= 0) {
-    res.status(400).json({ error: 'Sách không khả dụng' })
-    return
-  }
+  const book = await db.findBook(rental.bookId)
+  const description = `THANH TOAN TIEN PHAT PHIEU MUON ${rental.id} - ${book?.title || 'SACH'}`
+  const qrUrl = generateQRUrl(lateFee, description)
 
-  const borrowDate = getTodayDate()
-  const maxDueDate = addMonths(borrowDate, MAX_BORROW_MONTHS)
-  const finalDueDate = dueDate && dueDate.trim() ? dueDate : maxDueDate
-
-  if (finalDueDate < borrowDate || finalDueDate > maxDueDate) {
-    res.status(400).json({ error: 'Ngày hẹn trả không hợp lệ' })
-    return
-  }
-
-  const rental = db.addRental({
-    bookId,
-    memberId,
-    borrowDate,
-    dueDate: finalDueDate,
-    returnDate: null,
-    status: 'borrowed',
+  res.json({
+    rentalId: rental.id,
+    amount: lateFee,
+    description,
+    qrUrl,
   })
-
-  db.updateBook(bookId, { available: book.available - 1 })
-  res.status(201).json(rental)
 })
+
+router.post(
+  '/',
+  authMiddleware,
+  adminMiddleware,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const { bookId, memberId, dueDate } = req.body
+
+    if (!bookId || !memberId) {
+      res.status(400).json({ error: 'Thiếu thông tin mượn sách' })
+      return
+    }
+
+    const member = await db.findMember(memberId)
+    if (!member) {
+      res.status(400).json({ error: 'Không tìm thấy thành viên' })
+      return
+    }
+
+    if (isMemberBlacklisted(member)) {
+      res.status(400).json({ error: 'Thành viên đang bị blacklist' })
+      return
+    }
+
+    const book = await db.findBook(bookId)
+    if (!book || book.available <= 0) {
+      res.status(400).json({ error: 'Sách không khả dụng' })
+      return
+    }
+
+    const borrowDate = getTodayDate()
+    const maxDueDate = addMonths(borrowDate, MAX_BORROW_MONTHS)
+    const finalDueDate = dueDate && dueDate.trim() ? dueDate : maxDueDate
+
+    if (finalDueDate < borrowDate || finalDueDate > maxDueDate) {
+      res.status(400).json({ error: 'Ngày hẹn trả không hợp lệ' })
+      return
+    }
+
+    const rental = await db.addRental({
+      bookId,
+      memberId,
+      borrowDate,
+      dueDate: finalDueDate,
+      returnDate: null,
+      status: 'borrowed',
+    })
+
+    await db.updateBook(bookId, { available: book.available - 1 })
+    res.status(201).json(rental)
+  }
+)
 
 router.put(
   '/:id/return',
   authMiddleware,
   adminMiddleware,
-  (req: AuthRequest, res: Response): void => {
-    const rental = db.findRental(Number(req.params.id))
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const rental = await db.findRental(Number(req.params.id))
     if (!rental) {
       res.status(404).json({ error: 'Không tìm thấy phiếu mượn' })
       return
@@ -134,11 +182,11 @@ router.put(
     }
 
     const returnDate = getTodayDate()
-    db.updateRental(rental.id, { returnDate, status: 'returned' })
+    await db.updateRental(rental.id, { returnDate, status: 'returned' })
 
-    const book = db.findBook(rental.bookId)
+    const book = await db.findBook(rental.bookId)
     if (book) {
-      db.updateBook(rental.bookId, { available: book.available + 1 })
+      await db.updateBook(rental.bookId, { available: book.available + 1 })
     }
 
     const updatedRental = { ...rental, returnDate, status: 'returned' as const }

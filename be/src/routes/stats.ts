@@ -15,25 +15,38 @@ function isMemberBlacklisted(member: Member): boolean {
   return member.blacklistUntil >= getTodayDate()
 }
 
-router.get('/', authMiddleware, adminMiddleware, (_req: AuthRequest, res: Response): void => {
-  const today = getTodayDate()
+router.get(
+  '/',
+  authMiddleware,
+  adminMiddleware,
+  async (_req: AuthRequest, res: Response): Promise<void> => {
+    const today = getTodayDate()
 
-  const borrowed = db.rentals.filter(r => r.status === 'borrowed')
-  const overdue = borrowed.filter(r => r.dueDate < today)
-  const pendingRequests = db.requests.filter(r => r.status === 'pending').length
-  const pendingExtensions = db.extensionRequests.filter(e => e.status === 'pending').length
-  const blacklisted = db.members.filter(m => isMemberBlacklisted(m))
+    const [rentals, requests, extensionRequests, books, members] = await Promise.all([
+      db.getRentals(),
+      db.getRequests(),
+      db.getExtensionRequests(),
+      db.getBooks(),
+      db.getMembers(),
+    ])
 
-  res.json({
-    totalBooks: db.books.reduce((sum, b) => sum + b.quantity, 0),
-    totalMembers: db.members.length,
-    currentlyBorrowed: borrowed.length,
-    overdue: overdue.length,
-    pendingRequests,
-    pendingExtensions,
-    availableBooks: db.books.reduce((sum, b) => sum + b.available, 0),
-    blacklistedMembers: blacklisted.length,
-  })
-})
+    const borrowed = rentals.filter(r => r.status === 'borrowed')
+    const overdue = borrowed.filter(r => r.dueDate < today)
+    const pendingRequests = requests.filter(r => r.status === 'pending').length
+    const pendingExtensions = extensionRequests.filter(e => e.status === 'pending').length
+    const blacklisted = members.filter(m => isMemberBlacklisted(m))
+
+    res.json({
+      totalBooks: books.reduce((sum, b) => sum + b.quantity, 0),
+      totalMembers: members.length,
+      currentlyBorrowed: borrowed.length,
+      overdue: overdue.length,
+      pendingRequests,
+      pendingExtensions,
+      availableBooks: books.reduce((sum, b) => sum + b.available, 0),
+      blacklistedMembers: blacklisted.length,
+    })
+  }
+)
 
 export default router

@@ -15,37 +15,45 @@ function isMemberBlacklisted(member: Member): boolean {
   return member.blacklistUntil >= getTodayDate()
 }
 
-router.get('/', authMiddleware, adminMiddleware, (_req: AuthRequest, res: Response): void => {
-  const result = db.requests
-    .map(r => {
-      const book = db.findBook(r.bookId)
-      const user = db.findUser(r.userId)
-      return {
-        ...r,
-        bookTitle: book?.title || 'N/A',
-        userName: user?.name || 'N/A',
-      }
-    })
-    .reverse()
-  res.json(result)
-})
+router.get(
+  '/',
+  authMiddleware,
+  adminMiddleware,
+  async (_req: AuthRequest, res: Response): Promise<void> => {
+    const requests = await db.getRequests()
+    const result = await Promise.all(
+      requests.map(async r => {
+        const book = await db.findBook(r.bookId)
+        const user = await db.findUser(r.userId)
+        return {
+          ...r,
+          bookTitle: book?.title || 'N/A',
+          userName: user?.name || 'N/A',
+        }
+      })
+    )
+    res.json(result.reverse())
+  }
+)
 
-router.get('/my', authMiddleware, (req: AuthRequest, res: Response): void => {
-  const result = db.requests
-    .filter(r => r.userId === req.user!.userId)
-    .map(r => {
-      const book = db.findBook(r.bookId)
+router.get('/my', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  const requests = await db.getRequests()
+  const userRequests = requests.filter(r => r.userId === req.user!.userId)
+
+  const result = await Promise.all(
+    userRequests.map(async r => {
+      const book = await db.findBook(r.bookId)
       return {
         ...r,
         bookTitle: book?.title || 'N/A',
         bookAuthor: book?.author || 'N/A',
       }
     })
-    .reverse()
-  res.json(result)
+  )
+  res.json(result.reverse())
 })
 
-router.post('/', authMiddleware, (req: AuthRequest, res: Response): void => {
+router.post('/', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
   const { bookId, note } = req.body
 
   if (!bookId) {
@@ -53,16 +61,16 @@ router.post('/', authMiddleware, (req: AuthRequest, res: Response): void => {
     return
   }
 
-  const user = db.findUser(req.user!.userId)
+  const user = await db.findUser(req.user!.userId)
   if (user?.memberId) {
-    const member = db.findMember(user.memberId)
+    const member = await db.findMember(user.memberId)
     if (member && isMemberBlacklisted(member)) {
       res.status(400).json({ error: 'Bạn đang bị blacklist, không thể tạo yêu cầu' })
       return
     }
   }
 
-  const request = db.addRequest({
+  const request = await db.addRequest({
     bookId,
     userId: req.user!.userId,
     requestDate: getTodayDate(),
@@ -77,8 +85,8 @@ router.put(
   '/:id/approve',
   authMiddleware,
   adminMiddleware,
-  (req: AuthRequest, res: Response): void => {
-    const request = db.findRequest(Number(req.params.id))
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const request = await db.findRequest(Number(req.params.id))
     if (!request) {
       res.status(404).json({ error: 'Không tìm thấy yêu cầu' })
       return
@@ -89,33 +97,33 @@ router.put(
       return
     }
 
-    const user = db.findUser(request.userId)
+    const user = await db.findUser(request.userId)
     if (!user?.memberId) {
       res.status(400).json({ error: 'Người dùng không có thông tin thành viên' })
       return
     }
 
-    const member = db.findMember(user.memberId)
+    const member = await db.findMember(user.memberId)
     if (member && isMemberBlacklisted(member)) {
-      db.updateRequest(request.id, { status: 'rejected' })
+      await db.updateRequest(request.id, { status: 'rejected' })
       res.status(400).json({ error: 'Thành viên đang bị blacklist' })
       return
     }
 
-    const book = db.findBook(request.bookId)
+    const book = await db.findBook(request.bookId)
     if (!book || book.available <= 0) {
       res.status(400).json({ error: 'Sách không khả dụng' })
       return
     }
 
-    db.updateRequest(request.id, { status: 'approved' })
+    await db.updateRequest(request.id, { status: 'approved' })
 
     const borrowDate = getTodayDate()
     const dueDate = new Date()
     dueDate.setDate(dueDate.getDate() + 14)
     const dueDateStr = dueDate.toISOString().split('T')[0] || ''
 
-    db.addRental({
+    await db.addRental({
       bookId: request.bookId,
       memberId: user.memberId,
       borrowDate,
@@ -124,7 +132,7 @@ router.put(
       status: 'borrowed',
     })
 
-    db.updateBook(request.bookId, { available: book.available - 1 })
+    await db.updateBook(request.bookId, { available: book.available - 1 })
     res.json({ message: 'Đã duyệt yêu cầu' })
   }
 )
@@ -133,8 +141,8 @@ router.put(
   '/:id/reject',
   authMiddleware,
   adminMiddleware,
-  (req: AuthRequest, res: Response): void => {
-    const request = db.findRequest(Number(req.params.id))
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const request = await db.findRequest(Number(req.params.id))
     if (!request) {
       res.status(404).json({ error: 'Không tìm thấy yêu cầu' })
       return
@@ -145,7 +153,7 @@ router.put(
       return
     }
 
-    db.updateRequest(request.id, { status: 'rejected' })
+    await db.updateRequest(request.id, { status: 'rejected' })
     res.json({ message: 'Đã từ chối yêu cầu' })
   }
 )

@@ -123,6 +123,17 @@ export const useLibraryStore = defineStore('library', () => {
     return 'Chưa đến hạn'
   }
 
+  function getLateDays(rental: Rental): number {
+    const endDate = rental.returnDate || getTodayDate()
+    if (!endDate || endDate <= rental.dueDate) return 0
+    const diffMs = new Date(endDate).getTime() - new Date(rental.dueDate).getTime()
+    return Math.max(0, Math.floor(diffMs / (1000 * 60 * 60 * 24)))
+  }
+
+  function getLateFee(rental: Rental): number {
+    return getLateDays(rental) * DAILY_LATE_FEE
+  }
+
   const stats = computed<Stats>(() => {
     const today = getTodayDate()
     const borrowed = rentals.value.filter(r => r.status === 'borrowed')
@@ -402,6 +413,20 @@ export const useLibraryStore = defineStore('library', () => {
     }
   }
 
+  async function getRentalQR(rentalId: number): Promise<{
+    rentalId: number
+    amount: number
+    description: string
+    qrUrl: string
+  } | null> {
+    try {
+      return await api.rentals.getQR(rentalId)
+    } catch (e) {
+      showToast((e as Error).message, 'error')
+      return null
+    }
+  }
+
   async function addRequest(bookId: number, note: string = ''): Promise<Request | null> {
     try {
       const request = (await api.requests.create(bookId, note)) as Request
@@ -530,6 +555,9 @@ export const useLibraryStore = defineStore('library', () => {
     addExtensionRequest,
     approveExtensionRequest,
     rejectExtensionRequest,
+    getRentalQR,
+    getLateDays,
+    getLateFee,
     showToast,
   }
 })

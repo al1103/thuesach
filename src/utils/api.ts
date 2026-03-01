@@ -104,6 +104,10 @@ export const api = {
         body: JSON.stringify({ bookId, memberId, dueDate }),
       }),
     return: (id: number) => request<unknown>(`/rentals/${id}/return`, { method: 'PUT' }),
+    getQR: (id: number) =>
+      request<{ rentalId: number; amount: number; description: string; qrUrl: string }>(
+        `/rentals/${id}/qr`
+      ),
   },
 
   requests: {

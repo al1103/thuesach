@@ -6,6 +6,7 @@
 import { computed, ref } from 'vue'
 import { MAX_BORROW_MONTHS, useLibraryStore, type ReminderLevel } from '@/stores/library'
 import { exportToExcel, exportToPdf, type ExportColumn } from '@/utils/export'
+import PaymentQRModal from '@/components/features/PaymentQRModal.vue'
 
 defineOptions({
   name: 'RentalsView',
@@ -15,6 +16,8 @@ const store = useLibraryStore()
 
 const filterStatus = ref<'all' | 'borrowed' | 'returned'>('all')
 const showAddModal = ref<boolean>(false)
+const showQRModal = ref<boolean>(false)
+const selectedRentalId = ref<number | null>(null)
 
 const formData = ref({
   bookId: 0,
@@ -102,8 +105,13 @@ function getStatusText(rental: { status: string; dueDate: string }): string {
   return 'Đang mượn'
 }
 
-function handleReturn(rentalId: number): void {
-  const lateFee = store.returnBook(rentalId)
+function handleShowQR(rentalId: number): void {
+  selectedRentalId.value = rentalId
+  showQRModal.value = true
+}
+
+async function handleReturn(rentalId: number): Promise<void> {
+  const lateFee = await store.returnBook(rentalId)
   if (lateFee > 0) {
     store.showToast(`Đã xác nhận trả sách. Tiền phạt: ${formatCurrency(lateFee)}`, 'warning')
     return
@@ -231,10 +239,15 @@ function getReminderClass(level: ReminderLevel): string {
                 </span>
               </td>
               <td>
-                <button v-if="rental.status === 'borrowed'" class="btn btn-sm btn-success" @click="handleReturn(rental.id)">
-                  ✓ Xác nhận trả
-                </button>
-                <span v-else class="text-muted">{{ rental.returnDate }}</span>
+                <div class="action-group">
+                  <button v-if="rental.status === 'borrowed'" class="btn btn-sm btn-success" @click="handleReturn(rental.id)">
+                    ✓ Trả sách
+                  </button>
+                  <button v-if="rental.lateFee > 0" class="btn btn-sm btn-info" @click="handleShowQR(rental.id)">
+                    QR
+                  </button>
+                  <span v-if="rental.status === 'returned'" class="text-muted">{{ rental.returnDate }}</span>
+                </div>
               </td>
             </tr>
           </tbody>
@@ -282,6 +295,8 @@ function getReminderClass(level: ReminderLevel): string {
         </form>
       </div>
     </div>
+
+    <PaymentQRModal v-if="showQRModal && selectedRentalId" :rental-id="selectedRentalId" @close="showQRModal = false" />
   </div>
 </template>
 
@@ -294,5 +309,10 @@ function getReminderClass(level: ReminderLevel): string {
 .text-muted {
   color: var(--text-muted);
   font-size: 0.8125rem;
+}
+
+.action-group {
+  display: flex;
+  gap: 4px;
 }
 </style>

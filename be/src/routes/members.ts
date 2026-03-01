@@ -15,90 +15,116 @@ function isMemberBlacklisted(member: Member): boolean {
   return member.blacklistUntil >= getTodayDate()
 }
 
-router.get('/', authMiddleware, adminMiddleware, (_req: AuthRequest, res: Response): void => {
-  const result = db.members.map(m => ({
-    ...m,
-    isCurrentlyBlacklisted: isMemberBlacklisted(m),
-  }))
-  res.json(result)
-})
-
-router.get('/:id', authMiddleware, adminMiddleware, (req: AuthRequest, res: Response): void => {
-  const member = db.findMember(Number(req.params.id))
-  if (!member) {
-    res.status(404).json({ error: 'Không tìm thấy thành viên' })
-    return
+router.get(
+  '/',
+  authMiddleware,
+  adminMiddleware,
+  async (_req: AuthRequest, res: Response): Promise<void> => {
+    const members = await db.getMembers()
+    const result = members.map(m => ({
+      ...m,
+      isCurrentlyBlacklisted: isMemberBlacklisted(m),
+    }))
+    res.json(result)
   }
-  res.json({
-    ...member,
-    isCurrentlyBlacklisted: isMemberBlacklisted(member),
-  })
-})
+)
 
-router.post('/', authMiddleware, adminMiddleware, (req: AuthRequest, res: Response): void => {
-  const { name, email, phone } = req.body
-
-  if (!name || !email || !phone) {
-    res.status(400).json({ error: 'Thiếu thông tin thành viên' })
-    return
+router.get(
+  '/:id',
+  authMiddleware,
+  adminMiddleware,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const member = await db.findMember(Number(req.params.id))
+    if (!member) {
+      res.status(404).json({ error: 'Không tìm thấy thành viên' })
+      return
+    }
+    res.json({
+      ...member,
+      isCurrentlyBlacklisted: isMemberBlacklisted(member),
+    })
   }
+)
 
-  const member = db.addMember({
-    name,
-    email,
-    phone,
-    joinDate: getTodayDate(),
-    isBlacklisted: false,
-    blacklistUntil: null,
-    blacklistReason: '',
-  })
+router.post(
+  '/',
+  authMiddleware,
+  adminMiddleware,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const { name, email, phone } = req.body
 
-  res.status(201).json(member)
-})
+    if (!name || !email || !phone) {
+      res.status(400).json({ error: 'Thiếu thông tin thành viên' })
+      return
+    }
 
-router.put('/:id', authMiddleware, adminMiddleware, (req: AuthRequest, res: Response): void => {
-  const { name, email, phone } = req.body
-  const id = Number(req.params.id)
+    const member = await db.addMember({
+      name,
+      email,
+      phone,
+      joinDate: getTodayDate(),
+      isBlacklisted: false,
+      blacklistUntil: null,
+      blacklistReason: '',
+    })
 
-  const existing = db.findMember(id)
-  if (!existing) {
-    res.status(404).json({ error: 'Không tìm thấy thành viên' })
-    return
+    res.status(201).json(member)
   }
+)
 
-  const updated = db.updateMember(id, {
-    name: name ?? existing.name,
-    email: email ?? existing.email,
-    phone: phone ?? existing.phone,
-  })
+router.put(
+  '/:id',
+  authMiddleware,
+  adminMiddleware,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const { name, email, phone } = req.body
+    const id = Number(req.params.id)
 
-  res.json(updated)
-})
+    const existing = await db.findMember(id)
+    if (!existing) {
+      res.status(404).json({ error: 'Không tìm thấy thành viên' })
+      return
+    }
 
-router.delete('/:id', authMiddleware, adminMiddleware, (req: AuthRequest, res: Response): void => {
-  const deleted = db.deleteMember(Number(req.params.id))
-  if (!deleted) {
-    res.status(404).json({ error: 'Không tìm thấy thành viên' })
-    return
+    const updated = await db.updateMember(id, {
+      name: name ?? existing.name,
+      email: email ?? existing.email,
+      phone: phone ?? existing.phone,
+    })
+
+    res.json(updated)
   }
-  res.json({ message: 'Xóa thành viên thành công' })
-})
+)
+
+router.delete(
+  '/:id',
+  authMiddleware,
+  adminMiddleware,
+  async (req: AuthRequest, res: Response): Promise<void> => {
+    const deleted = await db.deleteMember(Number(req.params.id))
+    if (!deleted) {
+      res.status(404).json({ error: 'Không tìm thấy thành viên' })
+      return
+    }
+    res.json({ message: 'Xóa thành viên thành công' })
+  }
+)
 
 router.post(
   '/:id/blacklist',
   authMiddleware,
   adminMiddleware,
-  (req: AuthRequest, res: Response): void => {
+  async (req: AuthRequest, res: Response): Promise<void> => {
     const { until, reason } = req.body
     const id = Number(req.params.id)
 
-    const member = db.findMember(id)
+    const member = await db.findMember(id)
     if (!member) {
       res.status(404).json({ error: 'Không tìm thấy thành viên' })
       return
     }
 
-    db.updateMember(id, {
+    await db.updateMember(id, {
       isBlacklisted: true,
       blacklistUntil: until || null,
       blacklistReason: reason || '',
@@ -112,16 +138,16 @@ router.delete(
   '/:id/blacklist',
   authMiddleware,
   adminMiddleware,
-  (req: AuthRequest, res: Response): void => {
+  async (req: AuthRequest, res: Response): Promise<void> => {
     const id = Number(req.params.id)
 
-    const member = db.findMember(id)
+    const member = await db.findMember(id)
     if (!member) {
       res.status(404).json({ error: 'Không tìm thấy thành viên' })
       return
     }
 
-    db.updateMember(id, {
+    await db.updateMember(id, {
       isBlacklisted: false,
       blacklistUntil: null,
       blacklistReason: '',
