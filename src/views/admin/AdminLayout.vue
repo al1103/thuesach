@@ -65,7 +65,7 @@ function handleLogout(): void {
           :key="item.path"
           :to="item.path"
           class="nav-link"
-          :class="{ 'router-link-active': $route.name === item.name }"
+          exact-active-class="router-link-active"
         >
           <span class="icon"><i :class="item.icon"></i></span>
           <span>{{ item.label }}</span>
@@ -85,7 +85,7 @@ function handleLogout(): void {
         <div class="header-actions">
           <button class="mobile-menu-btn" @click="toggleSidebar"><i class="bi bi-list"></i></button>
           <div class="page-title-wrap">
-            <h1>{{ $route.meta.title || 'Dashboard' }}</h1>
+            <h1>{{ $route.meta.title || 'Hệ thống' }}</h1>
             <p class="page-subtitle">Quản trị hệ thống thư viện</p>
           </div>
         </div>

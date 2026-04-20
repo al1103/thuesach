@@ -124,13 +124,17 @@ router.post(
       return
     }
 
-    await db.updateMember(id, {
-      isBlacklisted: true,
-      blacklistUntil: until || null,
-      blacklistReason: reason || '',
-    })
-
-    res.json({ message: 'Đã đưa vào blacklist' })
+    try {
+      await db.updateMember(id, {
+        isBlacklisted: true,
+        blacklistUntil: until || null,
+        blacklistReason: reason || '',
+      })
+      res.json({ message: 'Đã đưa vào blacklist' })
+    } catch (error) {
+      console.error('Lỗi khi blacklist thành viên:', error)
+      res.status(500).json({ error: 'Không thể cập nhật trạng thái blacklist' })
+    }
   }
 )
 
@@ -147,13 +151,17 @@ router.delete(
       return
     }
 
-    await db.updateMember(id, {
-      isBlacklisted: false,
-      blacklistUntil: null,
-      blacklistReason: '',
-    })
-
-    res.json({ message: 'Đã xóa khỏi blacklist' })
+    try {
+      await db.updateMember(id, {
+        isBlacklisted: false,
+        blacklistUntil: null,
+        blacklistReason: '',
+      })
+      res.json({ message: 'Đã gỡ khỏi blacklist' })
+    } catch (error) {
+      console.error('Lỗi khi gỡ blacklist thành viên:', error)
+      res.status(500).json({ error: 'Không thể gỡ trạng thái blacklist' })
+    }
   }
 )
 

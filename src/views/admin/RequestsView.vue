@@ -3,7 +3,7 @@
  * @component RequestsView
  * @description Admin view for managing book borrow requests.
  */
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useLibraryStore } from '@/stores/library'
 import { exportToExcel, exportToPdf, type ExportColumn } from '@/utils/export'
 
@@ -12,6 +12,10 @@ defineOptions({
 })
 
 const store = useLibraryStore()
+
+onMounted(() => {
+  store.fetchRequests()
+})
 
 const filterStatus = ref<'all' | 'pending' | 'approved' | 'rejected'>('pending')
 
@@ -31,13 +35,12 @@ interface RequestDisplayItem {
 const filteredRequests = computed<RequestDisplayItem[]>(() => {
   let requests = store.requests.map(request => {
     const book = store.getBook(request.bookId)
-    const user = store.users.find(item => item.id === request.userId)
     return {
       ...request,
-      bookTitle: book?.title || 'N/A',
+      bookTitle: request.bookTitle || book?.title || 'N/A',
       bookAvailable: book?.available || 0,
-      userName: user?.name || 'N/A',
-      userInitial: user?.name?.charAt(0) || '?',
+      userName: request.userName || 'N/A',
+      userInitial: (request.userName || 'N/A').charAt(0),
     }
   })
 

@@ -3,7 +3,7 @@
  * @component MyRequestsView
  * @description User view to track borrow and extension requests.
  */
-import { computed } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useLibraryStore } from '@/stores/library'
 
 defineOptions({
@@ -11,6 +11,11 @@ defineOptions({
 })
 
 const store = useLibraryStore()
+
+onMounted(() => {
+  store.fetchMyRequests()
+  store.fetchMyExtensionRequests()
+})
 
 interface BorrowRequestDisplayItem {
   id: number

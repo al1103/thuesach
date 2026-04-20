@@ -355,6 +355,15 @@ export const useLibraryStore = defineStore('library', () => {
     return members.value.find(m => m.id === id)
   }
 
+  function isMemberBlacklisted(memberId: number): boolean {
+    const member = getMember(memberId)
+    if (!member) return false
+    if (!member.isBlacklisted) return false
+    if (!member.blacklistUntil) return true
+    const today = getTodayDate()
+    return member.blacklistUntil >= today
+  }
+
   async function setMemberBlacklist(
     memberId: number,
     until: string,
@@ -430,6 +439,7 @@ export const useLibraryStore = defineStore('library', () => {
   async function addRequest(bookId: number, note: string = ''): Promise<Request | null> {
     try {
       const request = (await api.requests.create(bookId, note)) as Request
+      requests.value.unshift(request)
       showToast('Tạo yêu cầu mượn thành công', 'success')
       return request
     } catch (e) {
@@ -470,6 +480,7 @@ export const useLibraryStore = defineStore('library', () => {
         requestedDueDate,
         note
       )) as ExtensionRequest
+      extensionRequests.value.unshift(ext)
       showToast('Tạo yêu cầu gia hạn thành công', 'success')
       return ext
     } catch (e) {
@@ -542,6 +553,7 @@ export const useLibraryStore = defineStore('library', () => {
     updateMember,
     deleteMember,
     getMember,
+    isMemberBlacklisted,
     setMemberBlacklist,
     clearMemberBlacklist,
     addRental,

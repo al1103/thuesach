@@ -3,7 +3,7 @@
  * @component MyRentalsView
  * @description User view to track rentals, reminders, and extension requests.
  */
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { MAX_BORROW_MONTHS, useLibraryStore, type ReminderLevel } from '@/stores/library'
 import PaymentQRModal from '@/components/features/PaymentQRModal.vue'
 
@@ -12,6 +12,11 @@ defineOptions({
 })
 
 const store = useLibraryStore()
+
+onMounted(() => {
+  store.fetchRentals()
+  store.fetchExtensionRequests()
+})
 
 const showExtensionModal = ref<boolean>(false)
 const showQRModal = ref<boolean>(false)
@@ -89,6 +94,13 @@ const minExtensionDueDate = computed<string>(() => {
   if (!selectedRental.value) return ''
   return addDays(selectedRental.value.dueDate, 1)
 })
+
+const isExtensionPossible = (rental: UserRentalItem): boolean => {
+  if (rental.status !== 'borrowed') return false
+  const max = addMonths(rental.borrowDate, MAX_BORROW_MONTHS)
+  const min = addDays(rental.dueDate, 1)
+  return min <= max
+}
 
 function getStatusClass(rental: UserRentalItem): string {
   if (rental.status === 'returned') return 'badge-success'
@@ -255,6 +267,7 @@ function formatDate(date: Date): string {
                   <button
                     v-if="rental.status === 'borrowed' && !hasPendingExtensionRequest(rental.id)"
                     class="btn btn-sm btn-secondary"
+                    :disabled="!isExtensionPossible(rental)"
                     @click="openExtensionModal(rental.id)"
                   >
                     Gia hạn

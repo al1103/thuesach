@@ -3,7 +3,7 @@
  * @component ExtensionRequestsView
  * @description Admin view for approving/rejecting rental extension requests.
  */
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useLibraryStore } from '@/stores/library'
 
 defineOptions({
@@ -11,6 +11,10 @@ defineOptions({
 })
 
 const store = useLibraryStore()
+
+onMounted(() => {
+  store.fetchExtensionRequests()
+})
 const filterStatus = ref<'all' | 'pending' | 'approved' | 'rejected'>('pending')
 
 interface ExtensionRequestDisplayItem {
@@ -30,16 +34,15 @@ interface ExtensionRequestDisplayItem {
 
 const filteredExtensionRequests = computed<ExtensionRequestDisplayItem[]>(() => {
   let requests = store.extensionRequests.map(request => {
-    const user = store.users.find(item => item.id === request.userId)
     const rental = store.rentals.find(item => item.id === request.rentalId)
     const book = rental ? store.getBook(rental.bookId) : null
 
     return {
       ...request,
-      userName: user?.name || 'N/A',
-      userInitial: user?.name?.charAt(0) || '?',
-      bookTitle: book?.title || 'N/A',
-      currentDueDate: rental?.dueDate || 'N/A',
+      userName: request.userName || 'N/A',
+      userInitial: (request.userName || 'N/A').charAt(0),
+      bookTitle: request.bookTitle || book?.title || 'N/A',
+      currentDueDate: request.currentDueDate || rental?.dueDate || 'N/A',
     }
   })
 

@@ -12,7 +12,6 @@ defineOptions({
 })
 
 const store = useLibraryStore()
-
 const searchQuery = ref<string>('')
 const showModal = ref<boolean>(false)
 const editingMember = ref<Member | null>(null)
@@ -22,6 +21,13 @@ const formData = ref({
   email: '',
   phone: '',
 })
+
+const showBlacklistModal = ref<boolean>(false)
+const blacklistData = ref({
+  until: '',
+  reason: '',
+})
+const memberForBlacklist = ref<Member | null>(null)
 
 const filteredMembers = computed<Member[]>(() => {
   const query = searchQuery.value.toLowerCase()
@@ -82,16 +88,22 @@ function getMemberRentals(memberId: number): number {
 }
 
 function handleBlacklist(member: Member): void {
-  const defaultUntil = addDays(new Date().toISOString().split('T')[0] ?? '', 7)
-  const until = window.prompt('Khóa đến ngày (YYYY-MM-DD)', defaultUntil)
-  if (!until) return
-  const reason = window.prompt('Lý do blacklist', 'Quá hạn nhiều lần') || 'Quá hạn nhiều lần'
-  const success = store.setMemberBlacklist(member.id, until, reason)
-  if (!success) {
-    store.showToast('Không thể blacklist thành viên', 'error')
-    return
+  memberForBlacklist.value = member
+  blacklistData.value = {
+    until: addDays(new Date().toISOString().split('T')[0] ?? '', 7),
+    reason: 'Quá hạn nhiều lần',
   }
-  store.showToast('Đã blacklist thành viên', 'warning')
+  showBlacklistModal.value = true
+}
+
+async function submitBlacklist(): Promise<void> {
+  if (!memberForBlacklist.value) return
+  const { until, reason } = blacklistData.value
+  const success = await store.setMemberBlacklist(memberForBlacklist.value.id, until, reason)
+  if (success) {
+    showBlacklistModal.value = false
+    memberForBlacklist.value = null
+  }
 }
 
 function handleClearBlacklist(member: Member): void {
@@ -167,9 +179,9 @@ function addDays(date: string, days: number): string {
             <tr v-for="member in filteredMembers" :key="member.id">
               <td>
                 <div class="member-cell">
-                  <div class="member-avatar">{{ member.name.charAt(0) }}</div>
+                  <div class="member-avatar">{{ member.name ? member.name.charAt(0) : '?' }}</div>
                   <div class="member-info">
-                    <div class="name">{{ member.name }}</div>
+                    <div class="name">{{ member.name || 'N/A' }}</div>
                   </div>
                 </div>
               </td>
@@ -216,28 +228,22 @@ function addDays(date: string, days: number): string {
       </div>
     </div>
 
-    <div v-if="showModal" class="modal-overlay" @click.self="showModal = false">
+    <div v-if="showBlacklistModal" class="modal-overlay" @click.self="showBlacklistModal = false">
       <div class="modal">
         <div class="modal-header">
-          <h3>{{ editingMember ? 'Sửa thành viên' : 'Thêm thành viên mới' }}</h3>
-          <button class="modal-close" @click="showModal = false">&times;</button>
+          <h3>Khóa thành viên: {{ memberForBlacklist?.name }}</h3>
+          <button class="modal-close" @click="showBlacklistModal = false">&times;</button>
         </div>
-        <form @submit.prevent="handleSubmit">
+        <form @submit.prevent="submitBlacklist">
           <div class="form-group">
-            <label>Họ và tên</label>
-            <input v-model="formData.name" type="text" placeholder="Nhập họ tên" required />
+            <label>Khóa đến ngày</label>
+            <input v-model="blacklistData.until" type="date" required />
           </div>
           <div class="form-group">
-            <label>Email</label>
-            <input v-model="formData.email" type="email" placeholder="Nhập email" />
+            <label>Lý do</label>
+            <textarea v-model="blacklistData.reason" rows="3" required></textarea>
           </div>
-          <div class="form-group">
-            <label>Số điện thoại</label>
-            <input v-model="formData.phone" type="tel" placeholder="Nhập số điện thoại" />
-          </div>
-          <button type="submit" class="btn btn-primary" style="width: 100%">
-            {{ editingMember ? 'Cập nhật' : 'Thêm thành viên' }}
-          </button>
+          <button type="submit" class="btn btn-danger" style="width: 100%">Xác nhận khóa</button>
         </form>
       </div>
     </div>
