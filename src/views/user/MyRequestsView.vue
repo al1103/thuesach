@@ -1,7 +1,7 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 /**
  * @component MyRequestsView
- * @description User view to track borrow and extension requests.
+ * @description User view to track borrow and extension requests with SaaS aesthetics.
  */
 import { computed, onMounted } from 'vue'
 import { useLibraryStore } from '@/stores/library'
@@ -12,9 +12,13 @@ defineOptions({
 
 const store = useLibraryStore()
 
-onMounted(() => {
-  store.fetchMyRequests()
-  store.fetchMyExtensionRequests()
+onMounted(async () => {
+  await Promise.all([
+    store.fetchMyRequests(),
+    store.fetchMyExtensionRequests(),
+    store.fetchBooks(),
+    store.fetchRentals(),
+  ])
 })
 
 interface BorrowRequestDisplayItem {
@@ -79,47 +83,45 @@ const pendingCount = computed<number>(() => {
 
 function getStatusClass(status: string): string {
   switch (status) {
-    case 'approved':
-      return 'badge-success'
-    case 'rejected':
-      return 'badge-danger'
-    default:
-      return 'badge-warning'
+    case 'approved': return 'badge-success'
+    case 'rejected': return 'badge-danger'
+    default: return 'badge-warning'
   }
 }
 
 function getStatusText(status: string): string {
   switch (status) {
-    case 'approved':
-      return 'Đã duyệt'
-    case 'rejected':
-      return 'Bị từ chối'
-    default:
-      return 'Đang chờ'
+    case 'approved': return 'Đã duyệt'
+    case 'rejected': return 'Từ chối'
+    default: return 'Đang chờ'
   }
 }
 </script>
 
 <template>
   <div class="my-requests-view">
-    <div class="summary-card">
-      <div class="summary-icon">📨</div>
-      <div class="summary-content">
-        <div class="summary-value">{{ pendingCount }}</div>
-        <div class="summary-label">Yêu cầu đang chờ duyệt</div>
+    <!-- Summary Stat -->
+    <div class="stat-card mb-8" style="max-width: 320px">
+      <div class="stat-icon bg-primary-soft text-primary">
+        <i class="bi bi-send"></i>
+      </div>
+      <div class="stat-info">
+        <span class="stat-value">{{ pendingCount }}</span>
+        <span class="stat-label">Yêu cầu đang chờ duyệt</span>
       </div>
     </div>
 
-    <div class="card">
+    <!-- Borrow Requests -->
+    <div class="card mb-8">
       <div class="card-header">
-        <h3>Yêu cầu mượn sách</h3>
+        <h3 class="card-title">Yêu cầu mượn sách</h3>
       </div>
       <div class="table-container">
-        <table v-if="myBorrowRequests.length" class="table table-hover align-middle">
+        <table v-if="myBorrowRequests.length">
           <thead>
             <tr>
-              <th>Sách</th>
-              <th>Ngày yêu cầu</th>
+              <th>Thông tin sách</th>
+              <th>Ngày gửi yêu cầu</th>
               <th>Ghi chú</th>
               <th>Trạng thái</th>
             </tr>
@@ -127,13 +129,15 @@ function getStatusText(status: string): string {
           <tbody>
             <tr v-for="request in myBorrowRequests" :key="request.id">
               <td>
-                <div>
-                  <strong>{{ request.bookTitle }}</strong>
-                  <div class="text-muted">{{ request.bookAuthor }}</div>
+                <div class="flex flex-column">
+                  <span class="font-bold text-main">{{ request.bookTitle }}</span>
+                  <span class="text-subtle" style="font-size: 0.75rem">{{ request.bookAuthor }}</span>
                 </div>
               </td>
-              <td>{{ request.requestDate }}</td>
-              <td>{{ request.note || '—' }}</td>
+              <td class="text-subtle">{{ request.requestDate }}</td>
+              <td class="text-subtle" style="max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                {{ request.note || '—' }}
+              </td>
               <td>
                 <span class="badge" :class="getStatusClass(request.status)">
                   {{ getStatusText(request.status) }}
@@ -142,37 +146,44 @@ function getStatusText(status: string): string {
             </tr>
           </tbody>
         </table>
+        
         <div v-else class="empty-state">
-          <div class="icon">📭</div>
-          <p>Bạn chưa gửi yêu cầu mượn nào</p>
+          <i class="bi bi-chat-left-dots empty-icon"></i>
+          <h3 class="empty-title">Không có yêu cầu mượn</h3>
+          <p class="empty-text">Bạn chưa gửi yêu cầu mượn sách nào gần đây.</p>
         </div>
       </div>
     </div>
 
+    <!-- Extension Requests -->
     <div class="card">
       <div class="card-header">
-        <h3>Yêu cầu gia hạn</h3>
+        <h3 class="card-title">Yêu cầu gia hạn</h3>
       </div>
       <div class="table-container">
-        <table v-if="myExtensionRequests.length" class="table table-hover align-middle">
+        <table v-if="myExtensionRequests.length">
           <thead>
             <tr>
-              <th>Sách</th>
+              <th>Thông tin sách</th>
               <th>Ngày yêu cầu</th>
               <th>Hạn hiện tại</th>
-              <th>Hạn đề xuất</th>
+              <th>Hạn đề xuất mới</th>
               <th>Trạng thái</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="request in myExtensionRequests" :key="request.id">
               <td>
-                <strong>{{ request.bookTitle }}</strong>
-                <div class="text-muted">{{ request.note || 'Không có ghi chú' }}</div>
+                <div class="flex flex-column">
+                  <span class="font-bold text-main">{{ request.bookTitle }}</span>
+                  <span class="text-subtle" style="font-size: 0.75rem">{{ request.note || 'Không có ghi chú' }}</span>
+                </div>
               </td>
-              <td>{{ request.requestDate }}</td>
-              <td>{{ request.currentDueDate }}</td>
-              <td>{{ request.requestedDueDate }}</td>
+              <td class="text-subtle">{{ request.requestDate }}</td>
+              <td class="text-subtle">{{ request.currentDueDate }}</td>
+              <td>
+                <span class="badge badge-info">{{ request.requestedDueDate }}</span>
+              </td>
               <td>
                 <span class="badge" :class="getStatusClass(request.status)">
                   {{ getStatusText(request.status) }}
@@ -181,9 +192,11 @@ function getStatusText(status: string): string {
             </tr>
           </tbody>
         </table>
+        
         <div v-else class="empty-state">
-          <div class="icon">🔁</div>
-          <p>Bạn chưa gửi yêu cầu gia hạn nào</p>
+          <i class="bi bi-calendar-event empty-icon"></i>
+          <h3 class="empty-title">Không có yêu cầu gia hạn</h3>
+          <p class="empty-text">Bạn chưa gửi yêu cầu gia hạn sách nào.</p>
         </div>
       </div>
     </div>
@@ -191,14 +204,44 @@ function getStatusText(status: string): string {
 </template>
 
 <style scoped>
-.my-requests-view {
+.stat-card {
+  background: white;
+  padding: var(--space-6);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-light);
   display: flex;
-  flex-direction: column;
-  gap: var(--space-lg);
+  align-items: center;
+  gap: var(--space-4);
 }
 
-.text-muted {
-  color: var(--text-muted);
-  font-size: 0.75rem;
+.stat-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
 }
+
+.stat-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.stat-value {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text-main);
+  line-height: 1.2;
+}
+
+.stat-label {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  font-weight: 500;
+}
+
+.font-bold { font-weight: 700; }
+.flex-column { flex-direction: column; }
 </style>

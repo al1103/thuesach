@@ -1,7 +1,7 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 /**
  * @component ExtensionRequestsView
- * @description Admin view for approving/rejecting rental extension requests.
+ * @description Admin view for approving/rejecting rental extension requests with SaaS aesthetics.
  */
 import { computed, ref, onMounted } from 'vue'
 import { useLibraryStore } from '@/stores/library'
@@ -12,9 +12,15 @@ defineOptions({
 
 const store = useLibraryStore()
 
-onMounted(() => {
-  store.fetchExtensionRequests()
+onMounted(async () => {
+  await Promise.all([
+    store.fetchExtensionRequests(),
+    store.fetchRentals(),
+    store.fetchBooks(),
+    store.fetchMembers(),
+  ])
 })
+
 const filterStatus = ref<'all' | 'pending' | 'approved' | 'rejected'>('pending')
 
 interface ExtensionRequestDisplayItem {
@@ -55,92 +61,72 @@ const filteredExtensionRequests = computed<ExtensionRequestDisplayItem[]>(() => 
 
 function getStatusClass(status: string): string {
   switch (status) {
-    case 'approved':
-      return 'badge-success'
-    case 'rejected':
-      return 'badge-danger'
-    default:
-      return 'badge-warning'
+    case 'approved': return 'badge-success'
+    case 'rejected': return 'badge-danger'
+    default: return 'badge-warning'
   }
 }
 
 function getStatusText(status: string): string {
   switch (status) {
-    case 'approved':
-      return 'Đã duyệt'
-    case 'rejected':
-      return 'Từ chối'
-    default:
-      return 'Chờ duyệt'
+    case 'approved': return 'Đã duyệt'
+    case 'rejected': return 'Từ chối'
+    default: return 'Chờ duyệt'
   }
 }
 
-function handleApprove(requestId: number): void {
-  const success = store.approveExtensionRequest(requestId)
-  if (!success) {
-    store.showToast('Không thể duyệt yêu cầu gia hạn', 'error')
-    return
-  }
-  store.showToast('Đã duyệt yêu cầu gia hạn')
+async function handleApprove(requestId: number): Promise<void> {
+  await store.approveExtensionRequest(requestId)
 }
 
-function handleReject(requestId: number): void {
-  const success = store.rejectExtensionRequest(requestId)
-  if (!success) {
-    store.showToast('Không thể từ chối yêu cầu gia hạn', 'error')
-    return
-  }
-  store.showToast('Đã từ chối yêu cầu gia hạn', 'warning')
+async function handleReject(requestId: number): Promise<void> {
+  await store.rejectExtensionRequest(requestId)
 }
 </script>
 
 <template>
   <div class="extension-requests-view">
-    <div class="search-box">
-      <div class="filter-tabs">
-        <button class="btn" :class="filterStatus === 'pending' ? 'btn-primary' : 'btn-secondary'" @click="filterStatus = 'pending'">
-          Chờ duyệt
-        </button>
-        <button class="btn" :class="filterStatus === 'approved' ? 'btn-primary' : 'btn-secondary'" @click="filterStatus = 'approved'">
-          Đã duyệt
-        </button>
-        <button class="btn" :class="filterStatus === 'rejected' ? 'btn-primary' : 'btn-secondary'" @click="filterStatus = 'rejected'">
-          Từ chối
-        </button>
-        <button class="btn" :class="filterStatus === 'all' ? 'btn-primary' : 'btn-secondary'" @click="filterStatus = 'all'">
-          Tất cả
-        </button>
+    <!-- Filter Actions -->
+    <div class="flex justify-between items-center mb-6">
+      <div class="filter-tabs mb-0">
+        <button class="btn" :class="{ 'active': filterStatus === 'pending' }" @click="filterStatus = 'pending'">Chờ duyệt</button>
+        <button class="btn" :class="{ 'active': filterStatus === 'approved' }" @click="filterStatus = 'approved'">Đã duyệt</button>
+        <button class="btn" :class="{ 'active': filterStatus === 'rejected' }" @click="filterStatus = 'rejected'">Từ chối</button>
+        <button class="btn" :class="{ 'active': filterStatus === 'all' }" @click="filterStatus = 'all'">Tất cả</button>
       </div>
     </div>
 
+    <!-- Requests Table -->
     <div class="card">
       <div class="table-container">
-        <table v-if="filteredExtensionRequests.length" class="table table-hover align-middle">
+        <table v-if="filteredExtensionRequests.length">
           <thead>
             <tr>
               <th>Người yêu cầu</th>
-              <th>Sách</th>
+              <th>Thông tin sách</th>
               <th>Ngày yêu cầu</th>
-              <th>Hạn hiện tại</th>
+              <th>Hạn trả hiện tại</th>
               <th>Hạn đề xuất</th>
               <th>Trạng thái</th>
-              <th>Thao tác</th>
+              <th class="text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="request in filteredExtensionRequests" :key="request.id">
               <td>
-                <div class="member-cell">
-                  <div class="member-avatar">{{ request.userInitial }}</div>
-                  <span>{{ request.userName }}</span>
+                <div class="flex items-center gap-2">
+                  <div class="avatar" style="width: 32px; height: 32px;">{{ request.userInitial }}</div>
+                  <span class="font-bold">{{ request.userName }}</span>
                 </div>
               </td>
               <td>
-                <strong>{{ request.bookTitle }}</strong>
-                <div class="text-muted">{{ request.note || 'Không có ghi chú' }}</div>
+                <div class="flex flex-column">
+                  <span class="text-main">{{ request.bookTitle }}</span>
+                  <span class="text-subtle" style="font-size: 0.75rem">{{ request.note || 'Không có ghi chú' }}</span>
+                </div>
               </td>
-              <td>{{ request.requestDate }}</td>
-              <td>{{ request.currentDueDate }}</td>
+              <td class="text-subtle">{{ request.requestDate }}</td>
+              <td class="text-subtle">{{ request.currentDueDate }}</td>
               <td>
                 <span class="badge badge-info">{{ request.requestedDueDate }}</span>
               </td>
@@ -149,20 +135,21 @@ function handleReject(requestId: number): void {
                   {{ getStatusText(request.status) }}
                 </span>
               </td>
-              <td>
-                <div v-if="request.status === 'pending'" class="action-buttons">
-                  <button class="btn btn-sm btn-success" @click="handleApprove(request.id)">✓ Duyệt</button>
-                  <button class="btn btn-sm btn-danger" @click="handleReject(request.id)">✕ Từ chối</button>
+              <td class="text-right">
+                <div v-if="request.status === 'pending'" class="flex gap-2 justify-end">
+                  <button class="btn btn-primary btn-sm" @click="handleApprove(request.id)">Duyệt</button>
+                  <button class="btn btn-outline btn-sm text-danger" @click="handleReject(request.id)">Từ chối</button>
                 </div>
-                <span v-else class="text-muted">{{ request.reviewedDate || '—' }}</span>
+                <span v-else class="text-subtle">Xong: {{ request.reviewedDate || '—' }}</span>
               </td>
             </tr>
           </tbody>
         </table>
-
+        
         <div v-else class="empty-state">
-          <div class="icon">🔁</div>
-          <p>Không có yêu cầu gia hạn nào</p>
+          <i class="bi bi-calendar-x empty-icon"></i>
+          <h3 class="empty-title">Không có yêu cầu gia hạn</h3>
+          <p class="empty-text">Hiện không có yêu cầu gia hạn sách nào cần xử lý.</p>
         </div>
       </div>
     </div>
@@ -170,8 +157,9 @@ function handleReject(requestId: number): void {
 </template>
 
 <style scoped>
-.text-muted {
-  color: var(--text-muted);
-  font-size: 0.75rem;
-}
+.text-right { text-align: right; }
+.text-danger { color: var(--danger) !important; }
+.font-bold { font-weight: 700; }
+.flex-column { flex-direction: column; }
+.mb-0 { margin-bottom: 0 !important; }
 </style>

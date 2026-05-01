@@ -1,7 +1,7 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 /**
  * @component AdminLayout
- * @description Main layout for admin dashboard with responsive sidebar navigation.
+ * @description Main layout for admin dashboard with professional SaaS aesthetics.
  */
 import { ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
@@ -24,12 +24,12 @@ interface NavItem {
 }
 
 const navItems: NavItem[] = [
-  { path: '/admin', name: 'admin-dashboard', icon: 'bi bi-speedometer2', label: 'Dashboard' },
-  { path: '/admin/books', name: 'admin-books', icon: 'bi bi-journal-bookmark', label: 'Quản lý sách' },
+  { path: '/admin', name: 'admin-dashboard', icon: 'bi bi-grid-1x2', label: 'Tổng quan' },
+  { path: '/admin/books', name: 'admin-books', icon: 'bi bi-book', label: 'Quản lý sách' },
   { path: '/admin/members', name: 'admin-members', icon: 'bi bi-people', label: 'Thành viên' },
-  { path: '/admin/rentals', name: 'admin-rentals', icon: 'bi bi-clipboard-check', label: 'Mượn/Trả' },
-  { path: '/admin/requests', name: 'admin-requests', icon: 'bi bi-inbox', label: 'Yêu cầu' },
-  { path: '/admin/extensions', name: 'admin-extensions', icon: 'bi bi-arrow-repeat', label: 'Gia hạn' },
+  { path: '/admin/rentals', name: 'admin-rentals', icon: 'bi bi-arrow-left-right', label: 'Mượn/Trả' },
+  { path: '/admin/requests', name: 'admin-requests', icon: 'bi bi-inbox', label: 'Yêu cầu mượn' },
+  { path: '/admin/extensions', name: 'admin-extensions', icon: 'bi bi-calendar-check', label: 'Yêu cầu gia hạn' },
 ]
 
 watch(
@@ -51,12 +51,13 @@ function handleLogout(): void {
 
 <template>
   <div class="app-container">
-    <div class="sidebar-backdrop" :class="{ show: isSidebarOpen }" @click="isSidebarOpen = false"></div>
-
-    <aside class="sidebar" :class="{ open: isSidebarOpen }">
+    <!-- Sidebar -->
+    <aside class="sidebar" :class="{ 'translate-x-0': isSidebarOpen }">
       <div class="sidebar-header">
-        <div class="logo"><i class="bi bi-book-half"></i></div>
-        <h2>Thư Viện Số</h2>
+        <div class="logo-icon">
+          <i class="bi bi-book-half"></i>
+        </div>
+        <span class="logo-text">Thư Viện Số</span>
       </div>
 
       <nav class="nav-menu">
@@ -67,45 +68,102 @@ function handleLogout(): void {
           class="nav-link"
           exact-active-class="router-link-active"
         >
-          <span class="icon"><i :class="item.icon"></i></span>
+          <i :class="item.icon"></i>
           <span>{{ item.label }}</span>
         </RouterLink>
       </nav>
 
-      <div class="logout-section">
-        <button class="nav-link" @click="handleLogout">
-          <span class="icon"><i class="bi bi-box-arrow-right"></i></span>
+      <div class="sidebar-footer">
+        <button class="nav-link w-full btn-ghost" @click="handleLogout">
+          <i class="bi bi-box-arrow-right"></i>
           <span>Đăng xuất</span>
         </button>
       </div>
     </aside>
 
-    <main class="main-content">
-      <header class="page-header">
-        <div class="header-actions">
-          <button class="mobile-menu-btn" @click="toggleSidebar"><i class="bi bi-list"></i></button>
-          <div class="page-title-wrap">
-            <h1>{{ $route.meta.title || 'Hệ thống' }}</h1>
-            <p class="page-subtitle">Quản trị hệ thống thư viện</p>
-          </div>
+    <!-- Main Content -->
+    <div class="main-wrapper">
+      <header class="header">
+        <div class="header-left">
+          <button class="btn btn-ghost d-lg-none" @click="toggleSidebar">
+            <i class="bi bi-list"></i>
+          </button>
+          <h1 class="page-title">{{ $route.meta.title || 'Hệ thống' }}</h1>
         </div>
-        <div class="user-info">
-          <div class="user-avatar">
-            {{ store.currentUser?.name?.charAt(0) || 'A' }}
+
+        <div class="header-right">
+          <div></div>
+
+          <div class="user-profile">
+            <div class="avatar">
+              {{ store.currentUser?.name?.charAt(0) || 'A' }}
+            </div>
+            <span class="user-name d-none d-sm-block">{{ store.currentUser?.name || 'Admin' }}</span>
+            <i class="bi bi-chevron-down text-subtle ms-1" style="font-size: 0.75rem"></i>
           </div>
-          <span class="user-name">{{ store.currentUser?.name || 'Admin' }}</span>
         </div>
       </header>
 
-      <RouterView />
-    </main>
+      <main class="content-body">
+        <RouterView />
+      </main>
+    </div>
 
+    <!-- Toasts -->
     <div class="toast-container">
       <div v-for="toast in store.toasts" :key="toast.id" class="toast" :class="toast.type">
-        <span v-if="toast.type === 'success'">✓</span>
-        <span v-else-if="toast.type === 'error'">✕</span>
-        <span>{{ toast.message }}</span>
+        <span class="toast-icon">
+          <i v-if="toast.type === 'success'" class="bi bi-check-circle-fill"></i>
+          <i v-else-if="toast.type === 'error'" class="bi bi-exclamation-circle-fill"></i>
+        </span>
+        <span class="toast-message">{{ toast.message }}</span>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+/* Responsive Sidebar Mobile */
+@media (max-width: 991.98px) {
+  .sidebar {
+    transform: translateX(-100%);
+  }
+  .sidebar.translate-x-0 {
+    transform: translateX(0);
+  }
+  .main-wrapper {
+    margin-left: 0;
+  }
+}
+
+.toast-container {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: white;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  border-left: 4px solid var(--primary);
+  min-width: 280px;
+  animation: slide-in 0.3s ease-out;
+}
+
+.toast.success { border-left-color: var(--success); }
+.toast.error { border-left-color: var(--danger); }
+
+@keyframes slide-in {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+</style>

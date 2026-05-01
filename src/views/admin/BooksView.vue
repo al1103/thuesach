@@ -1,7 +1,7 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 /**
  * @component BooksView
- * @description Admin book management with CRUD operations.
+ * @description Admin book management with professional SaaS aesthetics.
  */
 import { computed, onMounted, ref } from 'vue'
 import { useLibraryStore, type Book } from '@/stores/library'
@@ -26,7 +26,11 @@ const formData = ref({
   author: '',
   category: '',
   quantity: 1,
+  coverUrl: '',
 })
+
+const coverFile = ref<File | null>(null)
+const coverPreview = ref<string>('')
 
 const filteredBooks = computed<Book[]>(() => {
   const query = searchQuery.value.toLowerCase()
@@ -50,7 +54,9 @@ const bookExportColumns: ExportColumn<Book>[] = [
 
 function openAddModal(): void {
   editingBook.value = null
-  formData.value = { title: '', author: '', category: '', quantity: 1 }
+  formData.value = { title: '', author: '', category: '', quantity: 1, coverUrl: '' }
+  coverFile.value = null
+  coverPreview.value = ''
   showModal.value = true
 }
 
@@ -61,23 +67,46 @@ function openEditModal(book: Book): void {
     author: book.author,
     category: book.category,
     quantity: book.quantity,
+    coverUrl: book.coverUrl || '',
   }
+  coverFile.value = null
+  coverPreview.value = book.coverUrl || ''
   showModal.value = true
 }
 
-async function handleSubmit(): Promise<void> {
-  if (editingBook.value) {
-    await store.updateBook(editingBook.value.id, {
-      ...formData.value,
-      available: formData.value.quantity - (editingBook.value.quantity - editingBook.value.available),
-    })
-  } else {
-    await store.addBook({
-      ...formData.value,
-      available: formData.value.quantity,
-    })
+function handleFileChange(event: Event): void {
+  const target = event.target as HTMLInputElement
+  if (target.files && target.files[0]) {
+    coverFile.value = target.files[0]
+    coverPreview.value = URL.createObjectURL(target.files[0])
   }
-  showModal.value = false
+}
+
+async function handleSubmit(): Promise<void> {
+  store.loading = true
+  try {
+    if (coverFile.value) {
+      const uploadedUrl = await store.uploadBookCover(coverFile.value)
+      if (uploadedUrl) {
+        formData.value.coverUrl = uploadedUrl
+      }
+    }
+
+    if (editingBook.value) {
+      await store.updateBook(editingBook.value.id, {
+        ...formData.value,
+        available: formData.value.quantity - (editingBook.value.quantity - editingBook.value.available),
+      })
+    } else {
+      await store.addBook({
+        ...formData.value,
+        available: formData.value.quantity,
+      })
+    }
+    showModal.value = false
+  } finally {
+    store.loading = false
+  }
 }
 
 async function handleDelete(book: Book): Promise<void> {
@@ -92,121 +121,194 @@ function handleExportExcel(): void {
     return
   }
   exportToExcel(filteredBooks.value, bookExportColumns, 'Books', 'danh-sach-sach')
-  store.showToast('Đã xuất Excel danh sách sách')
-}
-
-function handleExportPdf(): void {
-  if (!filteredBooks.value.length) {
-    store.showToast('Không có dữ liệu để xuất', 'error')
-    return
-  }
-  exportToPdf(filteredBooks.value, bookExportColumns, 'Danh sách sách', 'danh-sach-sach')
-  store.showToast('Đã xuất PDF danh sách sách')
+  store.showToast('Đã xuất Excel')
 }
 </script>
 
 <template>
   <div class="books-view">
-    <div class="search-box">
-      <input
-        v-model="searchQuery"
-        type="text"
-        class="search-input"
-        placeholder="🔍 Tìm kiếm sách theo tên, tác giả, thể loại..."
-      />
-      <div class="action-buttons">
-        <button class="btn btn-secondary" @click="handleExportExcel">
-          <i class="bi bi-file-earmark-excel"></i>
-          Excel
+    <!-- Header Actions -->
+    <div class="flex justify-between items-center mb-6">
+      <div class="search-bar">
+        <i class="bi bi-search"></i>
+        <input v-model="searchQuery" type="text" placeholder="Tìm kiếm theo tên, tác giả..." style="width: 320px;" />
+      </div>
+      
+      <div class="flex gap-2">
+        <button class="btn btn-outline" @click="handleExportExcel">
+          <i class="bi bi-download"></i> Xuất Excel
         </button>
-        <button class="btn btn-secondary" @click="handleExportPdf">
-          <i class="bi bi-file-earmark-pdf"></i>
-          PDF
+        <button class="btn btn-primary" @click="openAddModal">
+          <i class="bi bi-plus-lg"></i> Thêm sách mới
         </button>
-        <button class="btn btn-primary" @click="openAddModal">➕ Thêm sách</button>
       </div>
     </div>
 
+    <!-- Books Table -->
     <div class="card">
       <div class="table-container">
-        <table v-if="filteredBooks.length" class="table table-hover align-middle">
+        <table v-if="filteredBooks.length">
           <thead>
             <tr>
-              <th>Tên sách</th>
-              <th>Tác giả</th>
+              <th style="width: 80px">Bìa</th>
+              <th>Thông tin sách</th>
               <th>Thể loại</th>
-              <th>Số lượng</th>
-              <th>Còn lại</th>
-              <th>Thao tác</th>
+              <th>Kho</th>
+              <th>Trạng thái</th>
+              <th class="text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="book in filteredBooks" :key="book.id">
               <td>
-                <strong>{{ book.title }}</strong>
-              </td>
-              <td>{{ book.author }}</td>
-              <td>
-                <span class="badge badge-primary">{{ book.category }}</span>
-              </td>
-              <td>{{ book.quantity }}</td>
-              <td>
-                <span class="badge" :class="book.available > 0 ? 'badge-success' : 'badge-danger'">
-                  {{ book.available }}
-                </span>
+                <img v-if="book.coverUrl" :src="book.coverUrl" class="book-thumb" :alt="book.title" />
+                <div v-else class="no-thumb">
+                  <i class="bi bi-book text-subtle"></i>
+                </div>
               </td>
               <td>
-                <div class="action-buttons">
-                  <button class="btn-icon" title="Sửa" @click="openEditModal(book)">✏️</button>
-                  <button class="btn-icon" title="Xóa" @click="handleDelete(book)">🗑️</button>
+                <div class="flex flex-column">
+                  <span class="font-bold text-main">{{ book.title }}</span>
+                  <span class="text-subtle" style="font-size: 0.8125rem">{{ book.author }}</span>
+                </div>
+              </td>
+              <td>
+                <span class="badge badge-info">{{ book.category }}</span>
+              </td>
+              <td>
+                <div class="text-main font-medium">{{ book.available }} / {{ book.quantity }}</div>
+                <div class="w-full bg-app mt-1" style="height: 4px; border-radius: 2px; width: 60px; overflow: hidden">
+                  <div class="bg-primary" :style="{ width: (book.available / book.quantity * 100) + '%' }" style="height: 100%"></div>
+                </div>
+              </td>
+              <td>
+                <span v-if="book.available > 0" class="badge badge-success">Sẵn có</span>
+                <span v-else class="badge badge-danger">Hết sách</span>
+              </td>
+              <td class="text-right">
+                <div class="flex gap-1 justify-end">
+                  <button class="btn btn-ghost btn-sm" @click="openEditModal(book)" title="Chỉnh sửa">
+                    <i class="bi bi-pencil"></i>
+                  </button>
+                  <button class="btn btn-ghost btn-sm text-danger" @click="handleDelete(book)" title="Xóa">
+                    <i class="bi bi-trash"></i>
+                  </button>
                 </div>
               </td>
             </tr>
           </tbody>
         </table>
+        
         <div v-else class="empty-state">
-          <div class="icon">📚</div>
-          <p>Không tìm thấy sách nào</p>
+          <i class="bi bi-journal-x empty-icon"></i>
+          <h3 class="empty-title">Không tìm thấy sách</h3>
+          <p class="empty-text">Hãy thử thay đổi từ khóa tìm kiếm hoặc thêm sách mới vào hệ thống.</p>
         </div>
       </div>
     </div>
 
+    <!-- Add/Edit Modal -->
     <div v-if="showModal" class="modal-overlay" @click.self="showModal = false">
-      <div class="modal">
+      <div class="modal-content" style="max-width: 600px">
         <div class="modal-header">
-          <h3>{{ editingBook ? 'Sửa sách' : 'Thêm sách mới' }}</h3>
-          <button class="modal-close" @click="showModal = false">&times;</button>
-        </div>
-        <form @submit.prevent="handleSubmit">
-          <div class="form-group">
-            <label>Tên sách</label>
-            <input v-model="formData.title" type="text" placeholder="Nhập tên sách" required />
-          </div>
-          <div class="form-group">
-            <label>Tác giả</label>
-            <input v-model="formData.author" type="text" placeholder="Nhập tên tác giả" required />
-          </div>
-          <div class="form-group">
-            <label>Thể loại</label>
-            <select v-model="formData.category" required>
-              <option value="">Chọn thể loại</option>
-              <option value="Tiểu thuyết">Tiểu thuyết</option>
-              <option value="Kỹ năng sống">Kỹ năng sống</option>
-              <option value="Kinh doanh">Kinh doanh</option>
-              <option value="Lịch sử">Lịch sử</option>
-              <option value="Khoa học">Khoa học</option>
-              <option value="Văn học">Văn học</option>
-            </select>
-          </div>
-          <div class="form-group">
-            <label>Số lượng</label>
-            <input v-model.number="formData.quantity" type="number" min="1" required />
-          </div>
-          <button type="submit" class="btn btn-primary" style="width: 100%">
-            {{ editingBook ? 'Cập nhật' : 'Thêm sách' }}
+          <h3 class="card-title">{{ editingBook ? 'Cập nhật thông tin sách' : 'Thêm sách mới' }}</h3>
+          <button class="btn btn-ghost btn-sm" @click="showModal = false">
+            <i class="bi bi-x-lg"></i>
           </button>
+        </div>
+        
+        <form @submit.prevent="handleSubmit">
+          <div class="modal-body">
+            <div class="flex gap-6">
+              <!-- Cover Upload Section -->
+              <div style="width: 160px; flex-shrink: 0;">
+                <label class="form-label">Ảnh bìa</label>
+                <div class="upload-area" @click="$refs.fileInput.click()">
+                  <img v-if="coverPreview" :src="coverPreview" class="w-full" style="aspect-ratio: 2/3; object-fit: cover; border-radius: var(--radius-md);" />
+                  <div v-else class="upload-placeholder">
+                    <i class="bi bi-cloud-arrow-up"></i>
+                    <span>Tải ảnh</span>
+                  </div>
+                  <input type="file" ref="fileInput" hidden accept="image/*" @change="handleFileChange" />
+                </div>
+              </div>
+
+              <!-- Main Info Section -->
+              <div class="flex-1">
+                <div class="form-group">
+                  <label class="form-label">Tên sách</label>
+                  <input v-model="formData.title" class="form-control" placeholder="Ví dụ: Đắc Nhân Tâm" required />
+                </div>
+                
+                <div class="form-group">
+                  <label class="form-label">Tác giả</label>
+                  <input v-model="formData.author" class="form-control" placeholder="Ví dụ: Dale Carnegie" required />
+                </div>
+
+                <div class="flex gap-4">
+                  <div class="form-group" style="flex: 2">
+                    <label class="form-label">Thể loại</label>
+                    <select v-model="formData.category" class="form-control" required>
+                      <option value="">Chọn thể loại</option>
+                      <option v-for="cat in ['Tiểu thuyết', 'Kỹ năng sống', 'Kinh doanh', 'Lịch sử', 'Khoa học', 'Văn học']" :key="cat" :value="cat">
+                        {{ cat }}
+                      </option>
+                    </select>
+                  </div>
+                  <div class="form-group" style="flex: 1">
+                    <label class="form-label">Số lượng</label>
+                    <input v-model.number="formData.quantity" type="number" min="1" class="form-control" required />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline" @click="showModal = false">Hủy</button>
+            <button type="submit" class="btn btn-primary" :disabled="store.loading">
+              <span v-if="store.loading" class="spinner-border spinner-border-sm me-2"></span>
+              {{ editingBook ? 'Lưu thay đổi' : 'Thêm sách' }}
+            </button>
+          </div>
         </form>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.text-right { text-align: right; }
+.text-danger { color: var(--danger) !important; }
+.font-bold { font-weight: 700; }
+.flex-column { flex-direction: column; }
+.ms-1 { margin-left: var(--space-1); }
+.mt-1 { margin-top: var(--space-1); }
+
+.upload-area {
+  border: 2px dashed var(--border-main);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s;
+  overflow: hidden;
+}
+
+.upload-area:hover {
+  border-color: var(--primary);
+  background-color: var(--primary-light);
+}
+
+.upload-placeholder {
+  aspect-ratio: 2/3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-subtle);
+  gap: var(--space-2);
+}
+
+.upload-placeholder i {
+  font-size: 2rem;
+}
+</style>

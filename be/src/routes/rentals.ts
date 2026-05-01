@@ -11,8 +11,9 @@ function getTodayDate(): string {
   return new Date().toISOString().split('T')[0] || ''
 }
 
-function addMonths(date: string, months: number): string {
-  const [year, month, day] = date.split('-').map(Number)
+function addMonths(date: string | Date, months: number): string {
+  const dateStr = typeof date === 'string' ? date : date.toISOString().split('T')[0] || ''
+  const [year, month, day] = dateStr.split('-').map(Number)
   const d = new Date(Date.UTC(year || 0, (month || 1) - 1, day || 1))
   d.setUTCMonth(d.getUTCMonth() + months)
   return d.toISOString().split('T')[0] || ''

@@ -1,4 +1,4 @@
-﻿import { defineStore } from 'pinia'
+import { defineStore } from 'pinia'
 import { computed, ref } from 'vue'
 import { api, getToken } from '@/utils/api'
 
@@ -9,6 +9,7 @@ export interface Book {
   category: string
   quantity: number
   available: number
+  coverUrl?: string
 }
 
 export interface Member {
@@ -75,6 +76,7 @@ export interface User {
   role: 'admin' | 'user'
   name: string
   memberId?: number
+  member?: Member | null
 }
 
 export interface Stats {
@@ -279,6 +281,19 @@ export const useLibraryStore = defineStore('library', () => {
     }
   }
 
+  async function uploadBookCover(file: File): Promise<string | null> {
+    try {
+      const formData = new FormData()
+      formData.append('image', file)
+
+      const result = await api.books.upload(formData)
+      return result.url
+    } catch (err: any) {
+      showToast(err.message || 'Lỗi khi tải ảnh lên', 'error')
+      return null
+    }
+  }
+
   async function addBook(book: Omit<Book, 'id'>): Promise<Book | null> {
     try {
       const newBook = (await api.books.create(book)) as Book
@@ -356,8 +371,19 @@ export const useLibraryStore = defineStore('library', () => {
   }
 
   function isMemberBlacklisted(memberId: number): boolean {
-    const member = getMember(memberId)
-    if (!member) return false
+    // If admin, check in members list
+    if (currentUser.value?.role === 'admin') {
+      const member = getMember(memberId)
+      if (!member) return false
+      if (!member.isBlacklisted) return false
+      if (!member.blacklistUntil) return true
+      const today = getTodayDate()
+      return member.blacklistUntil >= today
+    }
+    
+    // If user, check their own member info
+    const member = currentUser.value?.member
+    if (!member || member.id !== memberId) return false
     if (!member.isBlacklisted) return false
     if (!member.blacklistUntil) return true
     const today = getTodayDate()
@@ -515,6 +541,11 @@ export const useLibraryStore = defineStore('library', () => {
   }
 
   function showToast(message: string, type: string = 'success'): void {
+    // Suppress permission errors for regular users
+    if (currentUser.value?.role !== 'admin' && message === 'Chỉ admin mới có quyền truy cập') {
+      return
+    }
+
     const id = Date.now()
     toasts.value.push({ id, message, type })
     setTimeout(() => {
@@ -545,6 +576,7 @@ export const useLibraryStore = defineStore('library', () => {
     login,
     logout,
     register,
+    uploadBookCover,
     addBook,
     updateBook,
     deleteBook,

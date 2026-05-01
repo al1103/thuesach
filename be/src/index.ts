@@ -14,7 +14,7 @@ import extensionsRoutes from './routes/extensions'
 import statsRoutes from './routes/stats'
 
 const app = express()
-const PORT = process.env.PORT || 3001
+const PORT = process.env.PORT || 3000
 
 app.use(helmet())
 app.use(

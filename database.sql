@@ -75,64 +75,48 @@ CREATE TABLE IF NOT EXISTS extension_requests (
 );
 
 -- Sample Data Initialization
-INSERT INTO books (title, author, category, quantity, available) VALUES
-('Đắc Nhân Tâm', 'Dale Carnegie', 'Kỹ năng sống', 5, 3),
-('Nhà Giả Kim', 'Paulo Coelho', 'Tiểu thuyết', 3, 2),
-('Sapiens: Lược Sử Loài Người', 'Yuval Noah Harari', 'Lịch sử', 4, 4),
-('Atomic Habits', 'James Clear', 'Kỹ năng sống', 6, 1),
-('Think and Grow Rich', 'Napoleon Hill', 'Kinh doanh', 3, 3),
-('1984', 'George Orwell', 'Tiểu thuyết', 2, 0),
-('Lược Sử Thời Gian', 'Stephen Hawking', 'Khoa học', 5, 5),
-('Kiếp Nào Ta Cũng Tìm Thấy Nhau', 'Brian L. Weiss', 'Kỹ năng sống', 3, 3),
-('Luật Tâm Thức', 'Ngô Sa Thạch', 'Kỹ năng sống', 4, 4),
-('Muôn Kiếp Nhân Sinh', 'Nguyên Phong', 'Kỹ năng sống', 6, 6),
-('Người Bán Hàng Vĩ Đại Nhất Thế Giới', 'Og Mandino', 'Kinh doanh', 10, 10),
-('Cha Giàu Cha Nghèo', 'Robert Kiyosaki', 'Kinh doanh', 8, 8),
-('Tôi Tự Học', 'Thu Giang Nguyễn Duy Cần', 'Văn học', 2, 2),
-('Suối Nguồn', 'Ayn Rand', 'Tiểu thuyết', 4, 4),
-('Tội Ác Và Hình Phạt', 'Fyodor Dostoevsky', 'Văn học', 3, 3),
-('Không Gia Đình', 'Hector Malot', 'Văn học', 5, 5),
-('Những Người Khốn Khổ', 'Victor Hugo', 'Văn học', 4, 4),
-('Bắt Trẻ Đồng Xanh', 'J.D. Salinger', 'Tiểu thuyết', 3, 3),
-('Giết Con Chim Nhại', 'Harper Lee', 'Tiểu thuyết', 4, 4),
-('Ông Già Và Biển Cả', 'Ernest Hemingway', 'Văn học', 2, 2);
-
-INSERT INTO members (name, email, phone, join_date) VALUES
-('Nguyễn Văn A', 'nguyenvana@email.com', '0901234567', '2024-01-15'),
-('Trần Thị B', 'tranthib@email.com', '0912345678', '2024-02-20'),
-('Lê Văn C', 'levanc@email.com', '0923456789', '2024-03-10'),
-('Nguyễn Thị D', 'nguyenthid@email.com', '0934567890', '2024-04-05'),
-('Phạm Văn E', 'phamvane@email.com', '0945678901', '2024-05-12'),
-('Hoàng Thị F', 'hoangthif@email.com', '0956789012', '2024-06-18'),
-('Vũ Văn G', 'vuvang@email.com', '0967890123', '2024-07-22'),
-('Lý Văn H', 'lyvanh@email.com', '0978901234', '2024-08-30'),
-('Đỗ Thị I', 'dothii@email.com', '0989012345', '2024-09-14'),
-('Bùi Văn K', 'buivank@email.com', '0990123456', '2024-10-01');
-
 -- Admin details (password: admin123)
--- User details (password: user123)
 INSERT INTO users (username, password, role, name, member_id) VALUES
-('admin', '$2a$10$gnc3khSmSYJpVocxBXqxheGFNyYfH2RHo01bXeCEansTnROKeS.A6', 'admin', 'Admin', NULL),
-('user', '$2a$10$477wUYOVZ78MT314GHz8Bexpka2aW1ZdNRdgC2.4lUbDHcToDy1sq', 'user', 'Nguyễn Văn User', 1),
-('nguyenvana', '$2a$10$477wUYOVZ78MT314GHz8Bexpka2aW1ZdNRdgC2.4lUbDHcToDy1sq', 'user', 'Nguyễn Văn A', 1),
-('tranthib', '$2a$10$477wUYOVZ78MT314GHz8Bexpka2aW1ZdNRdgC2.4lUbDHcToDy1sq', 'user', 'Trần Thị B', 2),
-('levanc', '$2a$10$477wUYOVZ78MT314GHz8Bexpka2aW1ZdNRdgC2.4lUbDHcToDy1sq', 'user', 'Lê Văn C', 3);
+('admin', '$2a$10$gnc3khSmSYJpVocxBXqxheGFNyYfH2RHo01bXeCEansTnROKeS.A6', 'admin', 'Admin', NULL);
 
--- 4. Initial Rentals
+-- Books from sample_books.csv
+INSERT INTO books (title, author, category, quantity, available) VALUES
+('Lược sử thời gian', 'Stephen Hawking', 'Khoa học', 5, 4), -- 1 borrowed
+('Kiếp nào ta cũng tìm thấy nhau', 'Brian L. Weiss', 'Kỹ năng sống', 3, 2), -- 1 borrowed
+('Luật tâm thức', 'Ngô Sa Thạch', 'Kỹ năng sống', 4, 4),
+('Muôn kiếp nhân sinh', 'Nguyên Phong', 'Kỹ năng sống', 6, 6),
+('Người bán hàng vĩ đại nhất thế giới', 'Og Mandino', 'Kinh doanh', 10, 10),
+('Cha giàu cha nghèo', 'Robert Kiyosaki', 'Kinh doanh', 8, 8),
+('Tôi tự học', 'Thu Giang Nguyễn Duy Cần', 'Văn học', 2, 2);
+
+-- Members from sample_members.csv
+INSERT INTO members (name, email, phone) VALUES
+('Nguyễn Thị D', 'nguyenthid@email.com', '0934567890'),
+('Phạm Văn E', 'phamvane@email.com', '0945678901'),
+('Hoàng Thị F', 'hoangthif@email.com', '0956789012'),
+('Vũ Văn G', 'vuvang@email.com', '0967890123');
+
+-- Additional Test Cases
+-- 1. Users for members (Common password: user123)
+INSERT INTO users (username, password, role, name, member_id) VALUES
+('user_d', '$2a$10$477wUYOVZ78MT314GHz8Bexpka2aW1ZdNRdgC2.4lUbDHcToDy1sq', 'user', 'Nguyễn Thị D', 1),
+('user_e', '$2a$10$477wUYOVZ78MT314GHz8Bexpka2aW1ZdNRdgC2.4lUbDHcToDy1sq', 'user', 'Phạm Văn E', 2);
+
+-- 2. Blacklisted Member
+INSERT INTO members (name, email, phone, is_blacklisted, blacklist_until, blacklist_reason) VALUES
+('Trần Văn Khóa', 'khoa@email.com', '0999888777', TRUE, '2026-12-31', 'Vi phạm nội quy trả sách muộn nhiều lần');
+
+-- 3. Active & Overdue Rentals
 INSERT INTO rentals (book_id, member_id, borrow_date, due_date, return_date, status) VALUES
-(1, 1, '2024-12-01', '2024-12-15', '2024-12-14', 'returned'),
-(2, 2, '2025-01-10', '2025-01-24', NULL, 'borrowed'),
-(3, 3, '2025-02-01', '2025-02-15', NULL, 'borrowed'),
-(4, 1, '2025-02-05', '2025-02-19', NULL, 'borrowed'),
-(6, 2, '2025-02-10', '2025-02-24', NULL, 'borrowed');
+(1, 1, CURRENT_DATE - INTERVAL '5 days', CURRENT_DATE + INTERVAL '9 days', NULL, 'borrowed'), -- Normal
+(2, 2, CURRENT_DATE - INTERVAL '30 days', CURRENT_DATE - INTERVAL '16 days', NULL, 'borrowed'), -- Overdue
+(3, 3, CURRENT_DATE - INTERVAL '10 days', CURRENT_DATE + INTERVAL '4 days', '2026-04-25', 'returned'); -- Already returned
 
--- 5. Initial Requests
-INSERT INTO requests (book_id, user_id, request_date, status, note) VALUES
-(5, 2, '2025-02-28', 'pending', 'Tôi muốn mượn quyển này vào tuần sau'),
-(10, 3, '2025-02-27', 'pending', 'Sách khoa học hay quá'),
-(12, 4, '2025-02-26', 'approved', 'Đã duyệt'),
-(15, 5, '2025-02-25', 'rejected', 'Hết sách');
+-- 4. Pending Requests
+INSERT INTO requests (book_id, user_id, note) VALUES
+(4, 1, 'Em xin mượn cuốn này để nghiên cứu học tập'),
+(5, 2, 'Yêu cầu mượn sách kinh doanh');
 
--- 6. Initial Extension Requests
-INSERT INTO extension_requests (rental_id, user_id, request_date, requested_due_date, status, note) VALUES
-(2, 4, '2025-02-20', '2025-03-10', 'pending', 'Cho mình thêm thời gian đọc nhé');
+-- 5. Extension Requests
+INSERT INTO extension_requests (rental_id, user_id, requested_due_date, note) VALUES
+(1, 1, CURRENT_DATE + INTERVAL '20 days', 'Em chưa đọc xong, xin gia hạn thêm ạ');

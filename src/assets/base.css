@@ -1,21 +1,21 @@
-﻿/* ===== Modern Library UI - Foundations ===== */
+/* ===== Modern Library UI - Foundations ===== */
 
 @import url('https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap');
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 
   /* Core palette */
-  --bg-app: #f3f6fb;
-  --bg-surface: #ffffff;
-  --bg-surface-soft: #f8fbff;
-  --bg-elevated: #ffffff;
+  --bg-app: #020617;
+  --bg-surface: #0f172a;
+  --bg-surface-soft: #1e293b;
+  --bg-elevated: #1e293b;
   --bg-sidebar: #0f172a;
-  --bg-sidebar-soft: #16213d;
-  --bg-overlay: rgba(15, 23, 42, 0.45);
+  --bg-sidebar-soft: #1e293b;
+  --bg-overlay: rgba(0, 0, 0, 0.7);
 
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
   --text-muted: #64748b;
   --text-inverse: #ffffff;
 
@@ -35,12 +35,12 @@
   --info-100: #e0f2fe;
   --info-600: #0284c7;
 
-  --border: #e2e8f0;
-  --border-strong: #cbd5e1;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.15);
 
   /* Surfaces */
-  --card-gradient: linear-gradient(145deg, #ffffff 0%, #f7fbff 100%);
-  --hero-gradient: linear-gradient(135deg, #1d4ed8 0%, #0ea5e9 50%, #22d3ee 100%);
+  --card-gradient: linear-gradient(145deg, #0f172a 0%, #1e293b 100%);
+  --hero-gradient: linear-gradient(135deg, #1e40af 0%, #1d4ed8 50%, #3b82f6 100%);
 
   /* Elevation */
   --shadow-xs: 0 1px 2px rgba(15, 23, 42, 0.06);

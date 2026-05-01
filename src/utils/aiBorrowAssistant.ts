@@ -56,7 +56,7 @@ export function getBorrowAssistantResponse(userPrompt: string, books: Book[]): A
   }
 
   const matchedProfile = PURPOSE_PROFILES.find(profile =>
-    profile.keywords.some(keyword => prompt.includes(keyword)),
+    profile.keywords.some(keyword => prompt.includes(keyword))
   )
 
   const scoredBooks = availableBooks
@@ -105,7 +105,10 @@ function getBookScore(book: Book, prompt: string, profile?: PurposeProfile): num
   if (prompt.includes(normalizedTitle)) score += 3
   if (prompt.includes(normalizedAuthor)) score += 2
 
-  if (profile && profile.categories.some(category => normalizeText(category) === normalizedCategory)) {
+  if (
+    profile &&
+    profile.categories.some(category => normalizeText(category) === normalizedCategory)
+  ) {
     score += 5
   }
 
@@ -114,7 +117,10 @@ function getBookScore(book: Book, prompt: string, profile?: PurposeProfile): num
 }
 
 function buildReason(book: Book, profile?: PurposeProfile): string {
-  if (profile && profile.categories.some(category => normalizeText(category) === normalizeText(book.category))) {
+  if (
+    profile &&
+    profile.categories.some(category => normalizeText(category) === normalizeText(book.category))
+  ) {
     return `Phù hợp mục tiêu "${profile.label}" và còn ${book.available} cuốn.`
   }
   return `Liên quan nội dung bạn cần và hiện còn ${book.available} cuốn để mượn.`

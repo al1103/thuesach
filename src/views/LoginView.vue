@@ -1,9 +1,9 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 /**
  * @component LoginView
- * @description Login page with role selection and registration modal.
+ * @description Login and Registration page with professional SaaS aesthetics.
  */
-import { ref } from 'vue'
+import { ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLibraryStore } from '../stores/library'
 
@@ -14,10 +14,10 @@ defineOptions({
 const router = useRouter()
 const store = useLibraryStore()
 
-const selectedRole = ref<'admin' | 'user'>('admin')
 const username = ref<string>('')
 const password = ref<string>('')
-const showRegister = ref<boolean>(false)
+const isLoginMode = ref<boolean>(true)
+const error = ref<string>('')
 
 const regName = ref<string>('')
 const regEmail = ref<string>('')
@@ -25,22 +25,22 @@ const regPhone = ref<string>('')
 const regUsername = ref<string>('')
 const regPassword = ref<string>('')
 
+watch([username, password, regUsername, regPassword, isLoginMode], () => {
+  error.value = ''
+})
+
 async function handleLogin(): Promise<void> {
+  error.value = ''
   const user = await store.login(username.value, password.value)
   if (user) {
-    if (selectedRole.value === 'admin' && user.role !== 'admin') {
-      store.showToast('Bạn không có quyền Admin!', 'error')
-      return
-    }
-    if (selectedRole.value === 'user' && user.role !== 'user') {
-      store.showToast('Vui lòng đăng nhập với tài khoản User!', 'error')
-      return
-    }
     router.push(user.role === 'admin' ? '/admin' : '/user')
+  } else {
+    error.value = 'Tên đăng nhập hoặc mật khẩu không chính xác'
   }
 }
 
 async function handleRegister(): Promise<void> {
+  error.value = ''
   const result = await store.register({
     name: regName.value,
     email: regEmail.value,
@@ -50,125 +50,136 @@ async function handleRegister(): Promise<void> {
   })
 
   if (result) {
-    showRegister.value = false
-    regName.value = ''
-    regEmail.value = ''
-    regPhone.value = ''
-    regUsername.value = ''
-    regPassword.value = ''
+    isLoginMode.value = true
+    store.showToast('Đăng ký thành công! Vui lòng đăng nhập.', 'success')
+  } else {
+    error.value = 'Đăng ký thất bại. Vui lòng kiểm tra lại thông tin.'
   }
 }
 </script>
 
 <template>
-  <div class="login-container">
-    <div class="login-shell">
-      <section class="login-hero">
-        <div>
-          <h2>Quản lý thư viện hiện đại, gọn và trực quan</h2>
-          <p>Theo dõi sách, thành viên, mượn trả và yêu cầu chỉ trong một bảng điều khiển.</p>
+  <div class="login-page">
+    <div class="login-card">
+      <div class="login-header">
+        <div class="login-logo">
+          <i class="bi bi-book-half"></i>
         </div>
+        <h1 class="login-title">{{ isLoginMode ? 'Chào mừng trở lại' : 'Đăng ký thành viên' }}</h1>
+        <p class="login-subtitle">
+          {{ isLoginMode ? 'Đăng nhập vào hệ thống quản lý thư viện số' : 'Tham gia cộng đồng yêu sách ngay hôm nay' }}
+        </p>
+      </div>
 
-        <div class="hero-stats">
-          <div class="hero-stat">
-            <strong>Realtime</strong>
-            <span>Dữ liệu đồng bộ tại chỗ</span>
-          </div>
-          <div class="hero-stat">
-            <strong>Admin</strong>
-            <span>Kiểm soát toàn hệ thống</span>
-          </div>
-          <div class="hero-stat">
-            <strong>User</strong>
-            <span>Yêu cầu mượn nhanh chóng</span>
-          </div>
+      <div v-if="error" class="alert alert-danger">
+        <i class="bi bi-exclamation-circle"></i>
+        <span>{{ error }}</span>
+      </div>
+
+      <!-- Login Form -->
+      <form v-if="isLoginMode" @submit.prevent="handleLogin">
+        <div class="form-group">
+          <label class="form-label">Tên đăng nhập</label>
+          <input v-model="username" type="text" class="form-control" placeholder="Nhập username của bạn" required />
         </div>
-      </section>
-
-      <section class="login-box">
-        <h1><i class="bi bi-book-half me-2"></i>Thuê Sách</h1>
-        <p class="subtitle">Đăng nhập để tiếp tục sử dụng hệ thống</p>
-
-        <div class="role-selector">
-          <button class="role-btn" :class="{ active: selectedRole === 'admin' }" @click="selectedRole = 'admin'">
-            <span class="icon"><i class="bi bi-shield-lock"></i></span>
-            <span>Admin</span>
-            <span>Quản trị viên</span>
-          </button>
-          <button class="role-btn" :class="{ active: selectedRole === 'user' }" @click="selectedRole = 'user'">
-            <span class="icon"><i class="bi bi-person-circle"></i></span>
-            <span>User</span>
-            <span>Người mượn sách</span>
-          </button>
+        <div class="form-group">
+          <label class="form-label">Mật khẩu</label>
+          <input v-model="password" type="password" class="form-control" placeholder="••••••••" required />
         </div>
-
-        <form @submit.prevent="handleLogin">
-          <div class="form-group">
-            <label>Tên đăng nhập</label>
-            <input v-model="username" type="text" placeholder="Nhập tên đăng nhập" required />
-          </div>
-          <div class="form-group">
-            <label>Mật khẩu</label>
-            <input v-model="password" type="password" placeholder="Nhập mật khẩu" required />
-          </div>
-          <button type="submit" class="btn btn-primary" style="width: 100%">Đăng nhập</button>
-        </form>
-
-        <button
-          v-if="selectedRole === 'user'"
-          class="btn btn-secondary"
-          style="width: 100%; margin-top: 10px"
-          @click="showRegister = true"
-        >
-          Chưa có tài khoản? Đăng ký
+        <button type="submit" class="btn btn-primary w-full py-3" :disabled="store.loading">
+          <span v-if="store.loading" class="spinner-border spinner-border-sm me-2"></span>
+          Đăng nhập ngay
         </button>
+      </form>
 
-        <div class="demo-credentials">
-          <p>Thông tin tài khoản demo</p>
-          <p><strong>Admin:</strong> admin / admin123</p>
-          <p><strong>User:</strong> user / user123</p>
+      <!-- Register Form -->
+      <form v-else @submit.prevent="handleRegister">
+        <div class="form-group">
+          <label class="form-label">Họ và tên</label>
+          <input v-model="regName" type="text" class="form-control" placeholder="Họ và tên đầy đủ" required />
         </div>
-      </section>
-    </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label">Email</label>
+            <input v-model="regEmail" type="email" class="form-control" placeholder="email@example.com" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Điện thoại</label>
+            <input v-model="regPhone" type="tel" class="form-control" placeholder="0xxx xxx xxx" />
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label class="form-label">Username</label>
+            <input v-model="regUsername" type="text" class="form-control" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Mật khẩu</label>
+            <input v-model="regPassword" type="password" class="form-control" required />
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary w-full py-3" :disabled="store.loading">
+          Tạo tài khoản
+        </button>
+      </form>
 
-    <div v-if="showRegister" class="modal-overlay" @click.self="showRegister = false">
-      <div class="modal">
-        <div class="modal-header">
-          <h3>Đăng ký tài khoản</h3>
-          <button class="modal-close" @click="showRegister = false">&times;</button>
-        </div>
-        <form @submit.prevent="handleRegister">
-          <div class="form-group">
-            <label>Họ và tên</label>
-            <input v-model="regName" type="text" placeholder="Nhập họ và tên" required />
-          </div>
-          <div class="form-group">
-            <label>Email</label>
-            <input v-model="regEmail" type="email" placeholder="Nhập email" />
-          </div>
-          <div class="form-group">
-            <label>Số điện thoại</label>
-            <input v-model="regPhone" type="tel" placeholder="Nhập số điện thoại" />
-          </div>
-          <div class="form-group">
-            <label>Tên đăng nhập</label>
-            <input v-model="regUsername" type="text" placeholder="Nhập tên đăng nhập" required />
-          </div>
-          <div class="form-group">
-            <label>Mật khẩu</label>
-            <input v-model="regPassword" type="password" placeholder="Nhập mật khẩu" required />
-          </div>
-          <button type="submit" class="btn btn-primary" style="width: 100%">Đăng ký</button>
-        </form>
+      <div class="login-footer">
+        <p v-if="isLoginMode">
+          Chưa có tài khoản? 
+          <button class="btn-link" @click="isLoginMode = false">Đăng ký thành viên</button>
+        </p>
+        <p v-else>
+          Đã có tài khoản? 
+          <button class="btn-link" @click="isLoginMode = true">Quay lại đăng nhập</button>
+        </p>
       </div>
     </div>
 
+    <!-- Toasts -->
     <div class="toast-container">
       <div v-for="toast in store.toasts" :key="toast.id" class="toast" :class="toast.type">
-        <span v-if="toast.type === 'success'">✓</span>
-        <span v-else-if="toast.type === 'error'">✕</span>
-        <span>{{ toast.message }}</span>
+        <span class="toast-icon">
+          <i v-if="toast.type === 'success'" class="bi bi-check-circle-fill"></i>
+          <i v-else-if="toast.type === 'error'" class="bi bi-exclamation-circle-fill"></i>
+        </span>
+        <span class="toast-message">{{ toast.message }}</span>
       </div>
     </div>
   </div>
 </template>
+
+<style scoped>
+.py-3 { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+.me-2 { margin-right: 0.5rem; }
+
+.toast-container {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  background: white;
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  border-left: 4px solid var(--primary);
+  min-width: 280px;
+  animation: slide-in 0.3s ease-out;
+}
+
+.toast.success { border-left-color: var(--success); }
+.toast.error { border-left-color: var(--danger); }
+
+@keyframes slide-in {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+</style>

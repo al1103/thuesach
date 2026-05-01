@@ -1,4 +1,4 @@
-const API_BASE = 'http://localhost:3001/api'
+const API_BASE = 'http://localhost:3000/api'
 
 function getToken(): string | null {
   return sessionStorage.getItem('auth_token')
@@ -26,6 +26,28 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
   const response = await fetch(`${API_BASE}${endpoint}`, {
     ...options,
     headers,
+  })
+
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({ error: 'Lỗi không xác định' }))
+    throw new Error(error.error || `HTTP ${response.status}`)
+  }
+
+  return response.json()
+}
+
+async function uploadFile<T>(endpoint: string, formData: FormData): Promise<T> {
+  const token = getToken()
+  const headers: HeadersInit = {}
+
+  if (token) {
+    ;(headers as Record<string, string>)['Authorization'] = `Bearer ${token}`
+  }
+
+  const response = await fetch(`${API_BASE}${endpoint}`, {
+    method: 'POST',
+    headers,
+    body: formData,
   })
 
   if (!response.ok) {
@@ -76,6 +98,7 @@ export const api = {
     update: (id: number, data: unknown) =>
       request<unknown>(`/books/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: number) => request<{ message: string }>(`/books/${id}`, { method: 'DELETE' }),
+    upload: (formData: FormData) => uploadFile<{ url: string }>('/books/upload', formData),
   },
 
   members: {

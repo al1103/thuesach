@@ -27,7 +27,12 @@ router.post('/login', async (req: AuthRequest, res: Response): Promise<void> => 
   const token = generateToken({ userId: user.id, role: user.role })
   const { password: _, ...userWithoutPassword } = user
 
-  res.json({ user: userWithoutPassword, token })
+  let member = null
+  if (user.memberId) {
+    member = await db.findMember(user.memberId)
+  }
+
+  res.json({ user: { ...userWithoutPassword, member }, token })
 })
 
 router.post('/register', async (req: AuthRequest, res: Response): Promise<void> => {
@@ -66,7 +71,7 @@ router.post('/register', async (req: AuthRequest, res: Response): Promise<void> 
 
   const { password: _, ...userWithoutPassword } = user
   const token = generateToken({ userId: user.id, role: user.role })
-  res.status(201).json({ user: userWithoutPassword, token })
+  res.status(201).json({ user: { ...userWithoutPassword, member }, token })
 })
 
 router.get('/me', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
@@ -76,7 +81,13 @@ router.get('/me', authMiddleware, async (req: AuthRequest, res: Response): Promi
     return
   }
   const { password: _, ...userWithoutPassword } = user
-  res.json({ user: userWithoutPassword })
+  
+  let member = null
+  if (user.memberId) {
+    member = await db.findMember(user.memberId)
+  }
+
+  res.json({ user: { ...userWithoutPassword, member } })
 })
 
 router.post('/logout', (_req: AuthRequest, res: Response): void => {

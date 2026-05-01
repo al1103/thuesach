@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import LoginView from '../views/LoginView.vue'
 import AdminLayout from '../views/admin/AdminLayout.vue'
 import UserLayout from '../views/user/UserLayout.vue'
+import { useLibraryStore } from '@/stores/library'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -82,33 +83,32 @@ const router = createRouter({
           component: () => import('../views/user/MyRequestsView.vue'),
           meta: { title: 'Yêu cầu của tôi' },
         },
-        {
-          path: 'ai-assistant',
-          name: 'user-ai-assistant',
-          component: () => import('../views/user/AIAssistantView.vue'),
-          meta: { title: 'AI Tư vấn' },
-        },
       ],
     },
   ],
 })
 
-// Navigation guard - TẠM TẮT KIỂM TRA ĐĂNG NHẬP
-router.beforeEach((to, from, next) => {
-  // const currentUser = sessionStorage.getItem("currentUser");
-  // const user = currentUser ? JSON.parse(currentUser) : null;
+router.beforeEach(async (to, from, next) => {
+  const store = useLibraryStore()
+  
+  // Ensure user is loaded
+  if (!store.currentUser && localStorage.getItem('token')) {
+    await store.init()
+  }
 
-  // if (to.meta.requiresAuth && !user) {
-  //   next("/login");
-  // } else if (to.meta.role && user?.role !== to.meta.role) {
-  //   next(user?.role === "admin" ? "/admin" : "/user");
-  // } else if (to.path === "/login" && user) {
-  //   next(user.role === "admin" ? "/admin" : "/user");
-  // } else {
-  //   next();
-  // }
+  const user = store.currentUser
 
-  next()
+  if (to.meta.requiresAuth && !user) {
+    next('/login')
+  } else if (to.meta.role && user?.role !== to.meta.role) {
+    // If user tries to access admin page, redirect to user dashboard
+    // If admin tries to access user page, allow or redirect to admin dashboard
+    next(user?.role === 'admin' ? '/admin' : '/user')
+  } else if (to.path === '/login' && user) {
+    next(user.role === 'admin' ? '/admin' : '/user')
+  } else {
+    next()
+  }
 })
 
 export default router

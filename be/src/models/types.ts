@@ -5,6 +5,7 @@ export interface Book {
   category: string
   quantity: number
   available: number
+  coverUrl?: string
 }
 
 export interface Member {

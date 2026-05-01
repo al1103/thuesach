@@ -1,11 +1,11 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 /**
  * @component RequestsView
- * @description Admin view for managing book borrow requests.
+ * @description Admin view for managing book borrow requests with SaaS aesthetics.
  */
 import { computed, ref, onMounted } from 'vue'
 import { useLibraryStore } from '@/stores/library'
-import { exportToExcel, exportToPdf, type ExportColumn } from '@/utils/export'
+import { exportToExcel, type ExportColumn } from '@/utils/export'
 
 defineOptions({
   name: 'RequestsView',
@@ -13,8 +13,12 @@ defineOptions({
 
 const store = useLibraryStore()
 
-onMounted(() => {
-  store.fetchRequests()
+onMounted(async () => {
+  await Promise.all([
+    store.fetchRequests(),
+    store.fetchBooks(),
+    store.fetchMembers(),
+  ])
 })
 
 const filterStatus = ref<'all' | 'pending' | 'approved' | 'rejected'>('pending')
@@ -57,39 +61,30 @@ const requestExportColumns: ExportColumn<RequestDisplayItem>[] = [
   { header: 'Sách', value: request => request.bookTitle },
   { header: 'Ngày yêu cầu', value: request => request.requestDate },
   { header: 'Ghi chú', value: request => request.note || '-' },
-  { header: 'Trạng thái', value: request => getStatusText(request.status) },
 ]
 
 function getStatusClass(status: string): string {
   switch (status) {
-    case 'approved':
-      return 'badge-success'
-    case 'rejected':
-      return 'badge-danger'
-    default:
-      return 'badge-warning'
+    case 'approved': return 'badge-success'
+    case 'rejected': return 'badge-danger'
+    default: return 'badge-warning'
   }
 }
 
 function getStatusText(status: string): string {
   switch (status) {
-    case 'approved':
-      return 'Đã duyệt'
-    case 'rejected':
-      return 'Từ chối'
-    default:
-      return 'Chờ duyệt'
+    case 'approved': return 'Đã duyệt'
+    case 'rejected': return 'Từ chối'
+    default: return 'Chờ duyệt'
   }
 }
 
-function handleApprove(requestId: number): void {
-  store.approveRequest(requestId)
-  store.showToast('Đã duyệt yêu cầu và tạo phiếu mượn')
+async function handleApprove(requestId: number): Promise<void> {
+  await store.approveRequest(requestId)
 }
 
-function handleReject(requestId: number): void {
-  store.rejectRequest(requestId)
-  store.showToast('Đã từ chối yêu cầu', 'error')
+async function handleReject(requestId: number): Promise<void> {
+  await store.rejectRequest(requestId)
 }
 
 function handleExportExcel(): void {
@@ -98,96 +93,84 @@ function handleExportExcel(): void {
     return
   }
   exportToExcel(filteredRequests.value, requestExportColumns, 'Requests', 'danh-sach-yeu-cau')
-  store.showToast('Đã xuất Excel yêu cầu mượn')
-}
-
-function handleExportPdf(): void {
-  if (!filteredRequests.value.length) {
-    store.showToast('Không có dữ liệu để xuất', 'error')
-    return
-  }
-  exportToPdf(filteredRequests.value, requestExportColumns, 'Danh sách yêu cầu mượn', 'danh-sach-yeu-cau')
-  store.showToast('Đã xuất PDF yêu cầu mượn')
+  store.showToast('Đã xuất Excel')
 }
 </script>
 
 <template>
   <div class="requests-view">
-    <div class="search-box">
-      <div class="filter-tabs">
-        <button class="btn" :class="filterStatus === 'pending' ? 'btn-primary' : 'btn-secondary'" @click="filterStatus = 'pending'">
-          Chờ duyệt
-        </button>
-        <button class="btn" :class="filterStatus === 'approved' ? 'btn-primary' : 'btn-secondary'" @click="filterStatus = 'approved'">
-          Đã duyệt
-        </button>
-        <button class="btn" :class="filterStatus === 'rejected' ? 'btn-primary' : 'btn-secondary'" @click="filterStatus = 'rejected'">
-          Từ chối
-        </button>
-        <button class="btn" :class="filterStatus === 'all' ? 'btn-primary' : 'btn-secondary'" @click="filterStatus = 'all'">
-          Tất cả
-        </button>
+    <!-- Filter Actions -->
+    <div class="flex justify-between items-center mb-6">
+      <div class="filter-tabs mb-0">
+        <button class="btn" :class="{ 'active': filterStatus === 'pending' }" @click="filterStatus = 'pending'">Chờ duyệt</button>
+        <button class="btn" :class="{ 'active': filterStatus === 'approved' }" @click="filterStatus = 'approved'">Đã duyệt</button>
+        <button class="btn" :class="{ 'active': filterStatus === 'rejected' }" @click="filterStatus = 'rejected'">Từ chối</button>
+        <button class="btn" :class="{ 'active': filterStatus === 'all' }" @click="filterStatus = 'all'">Tất cả</button>
       </div>
 
       <div class="action-buttons">
-        <button class="btn btn-secondary" @click="handleExportExcel">
-          <i class="bi bi-file-earmark-excel"></i>
-          Excel
-        </button>
-        <button class="btn btn-secondary" @click="handleExportPdf">
-          <i class="bi bi-file-earmark-pdf"></i>
-          PDF
+        <button class="btn btn-outline" @click="handleExportExcel">
+          <i class="bi bi-download"></i> Xuất Excel
         </button>
       </div>
     </div>
 
+    <!-- Requests Table -->
     <div class="card">
       <div class="table-container">
-        <table v-if="filteredRequests.length" class="table table-hover align-middle">
+        <table v-if="filteredRequests.length">
           <thead>
             <tr>
               <th>Người yêu cầu</th>
-              <th>Sách</th>
+              <th>Sách yêu cầu</th>
               <th>Ngày yêu cầu</th>
               <th>Ghi chú</th>
               <th>Trạng thái</th>
-              <th>Thao tác</th>
+              <th class="text-right">Thao tác</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="request in filteredRequests" :key="request.id">
               <td>
-                <div class="member-cell">
-                  <div class="member-avatar">{{ request.userInitial }}</div>
-                  <span>{{ request.userName }}</span>
+                <div class="flex items-center gap-2">
+                  <div class="avatar" style="width: 32px; height: 32px;">{{ request.userInitial }}</div>
+                  <span class="font-bold">{{ request.userName }}</span>
                 </div>
               </td>
               <td>
-                <strong>{{ request.bookTitle }}</strong>
-                <div class="book-availability-text">Còn lại: {{ request.bookAvailable }}</div>
+                <div class="flex flex-column">
+                  <span class="text-main">{{ request.bookTitle }}</span>
+                  <span class="text-subtle" style="font-size: 0.75rem">Sẵn có: {{ request.bookAvailable }} cuốn</span>
+                </div>
               </td>
-              <td>{{ request.requestDate }}</td>
-              <td>{{ request.note || '—' }}</td>
+              <td class="text-subtle">{{ request.requestDate }}</td>
+              <td class="text-subtle" style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">
+                {{ request.note || '—' }}
+              </td>
               <td>
                 <span class="badge" :class="getStatusClass(request.status)">
                   {{ getStatusText(request.status) }}
                 </span>
               </td>
-              <td>
-                <div v-if="request.status === 'pending'" class="action-buttons">
-                  <button class="btn btn-sm btn-success" :disabled="request.bookAvailable === 0" @click="handleApprove(request.id)">
-                    ✓ Duyệt
+              <td class="text-right">
+                <div v-if="request.status === 'pending'" class="flex gap-2 justify-end">
+                  <button class="btn btn-primary btn-sm" :disabled="request.bookAvailable === 0" @click="handleApprove(request.id)">
+                    Duyệt
                   </button>
-                  <button class="btn btn-sm btn-danger" @click="handleReject(request.id)">✕ Từ chối</button>
+                  <button class="btn btn-outline btn-sm text-danger" @click="handleReject(request.id)">
+                    Từ chối
+                  </button>
                 </div>
-                <span v-else class="text-muted">—</span>
+                <span v-else class="text-subtle">—</span>
               </td>
             </tr>
           </tbody>
         </table>
+        
         <div v-else class="empty-state">
-          <div class="icon">📨</div>
-          <p>Không có yêu cầu nào</p>
+          <i class="bi bi-inbox empty-icon"></i>
+          <h3 class="empty-title">Không có yêu cầu</h3>
+          <p class="empty-text">Hiện tại không có yêu cầu mượn sách nào trong danh mục này.</p>
         </div>
       </div>
     </div>
@@ -195,18 +178,9 @@ function handleExportPdf(): void {
 </template>
 
 <style scoped>
-.filter-tabs {
-  display: flex;
-  gap: var(--space-sm);
-}
-
-.book-availability-text {
-  font-size: 0.75rem;
-  color: var(--text-muted);
-  margin-top: 2px;
-}
-
-.text-muted {
-  color: var(--text-muted);
-}
+.text-right { text-align: right; }
+.text-danger { color: var(--danger) !important; }
+.font-bold { font-weight: 700; }
+.flex-column { flex-direction: column; }
+.mb-0 { margin-bottom: 0 !important; }
 </style>

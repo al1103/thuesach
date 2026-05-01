@@ -9,8 +9,9 @@ function getTodayDate(): string {
   return new Date().toISOString().split('T')[0] || ''
 }
 
-function addMonths(date: string, months: number): string {
-  const [year, month, day] = date.split('-').map(Number)
+function addMonths(date: string | Date, months: number): string {
+  const dateStr = typeof date === 'string' ? date : date.toISOString().split('T')[0] || ''
+  const [year, month, day] = dateStr.split('-').map(Number)
   const d = new Date(Date.UTC(year || 0, (month || 1) - 1, day || 1))
   d.setUTCMonth(d.getUTCMonth() + months)
   return d.toISOString().split('T')[0] || ''
@@ -27,7 +28,9 @@ router.get(
   authMiddleware,
   adminMiddleware,
   async (_req: AuthRequest, res: Response): Promise<void> => {
+    console.log('GET /api/extensions called')
     const extensionRequests = await db.getExtensionRequests()
+    console.log(`Found ${extensionRequests.length} extension requests`)
     const result = await Promise.all(
       extensionRequests.map(async e => {
         const rental = await db.findRental(e.rentalId)
@@ -42,13 +45,16 @@ router.get(
         }
       })
     )
+    console.log('GET /api/extensions success')
     res.json(result.reverse())
   }
 )
 
 router.get('/my', authMiddleware, async (req: AuthRequest, res: Response): Promise<void> => {
+  console.log(`GET /api/extensions/my called for user ${req.user!.userId}`)
   const extensionRequests = await db.getExtensionRequests()
   const userExtensions = extensionRequests.filter(e => e.userId === req.user!.userId)
+  console.log(`Found ${userExtensions.length} extension requests for user`)
 
   const result = await Promise.all(
     userExtensions.map(async e => {

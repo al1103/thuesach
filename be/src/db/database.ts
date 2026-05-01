@@ -5,20 +5,32 @@ class DatabaseManager {
   // Books
   async getBooks(): Promise<Book[]> {
     const res = await db.query('SELECT * FROM books ORDER BY id')
-    return res.rows
+    return res.rows.map(b => ({
+      ...b,
+      coverUrl: b.cover_url,
+    }))
   }
 
   async findBook(id: number): Promise<Book | undefined> {
     const res = await db.query('SELECT * FROM books WHERE id = $1', [id])
-    return res.rows[0]
+    const b = res.rows[0]
+    if (!b) return undefined
+    return {
+      ...b,
+      coverUrl: b.cover_url,
+    }
   }
 
   async addBook(book: Omit<Book, 'id'>): Promise<Book> {
     const res = await db.query(
-      'INSERT INTO books (title, author, category, quantity, available) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-      [book.title, book.author, book.category, book.quantity, book.available]
+      'INSERT INTO books (title, author, category, quantity, available, cover_url) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+      [book.title, book.author, book.category, book.quantity, book.available, book.coverUrl]
     )
-    return res.rows[0]
+    const b = res.rows[0]
+    return {
+      ...b,
+      coverUrl: b.cover_url,
+    }
   }
 
   async updateBook(id: number, data: Partial<Book>): Promise<Book | undefined> {
@@ -27,10 +39,14 @@ class DatabaseManager {
 
     const updated = { ...existing, ...data }
     const res = await db.query(
-      'UPDATE books SET title = $1, author = $2, category = $3, quantity = $4, available = $5 WHERE id = $6 RETURNING *',
-      [updated.title, updated.author, updated.category, updated.quantity, updated.available, id]
+      'UPDATE books SET title = $1, author = $2, category = $3, quantity = $4, available = $5, cover_url = $6 WHERE id = $7 RETURNING *',
+      [updated.title, updated.author, updated.category, updated.quantity, updated.available, updated.coverUrl, id]
     )
-    return res.rows[0]
+    const b = res.rows[0]
+    return {
+      ...b,
+      coverUrl: b.cover_url,
+    }
   }
 
   async deleteBook(id: number): Promise<boolean> {

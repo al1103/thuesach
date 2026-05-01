@@ -1,8 +1,27 @@
-import { Router, Response } from 'express'
+import { Router, Request as ExpressRequest, Response } from 'express'
 import db from '../db/database'
 import { AuthRequest, authMiddleware, adminMiddleware } from '../middleware/auth'
+import { upload } from '../utils/cloudinary'
 
 const router = Router()
+
+router.post(
+  '/upload',
+  authMiddleware,
+  adminMiddleware,
+  upload.single('image'),
+  (req: ExpressRequest, res: Response) => {
+    console.log('Upload request received')
+    if (!req.file) {
+      console.error('No file in request')
+      res.status(400).json({ error: 'Không có file nào được tải lên' })
+      return
+    }
+    const url = (req.file as any).path || (req.file as any).secure_url
+    console.log('File uploaded to Cloudinary:', url)
+    res.json({ url })
+  }
+)
 
 router.get('/', async (_req: AuthRequest, res: Response): Promise<void> => {
   const books = await db.getBooks()
@@ -23,7 +42,7 @@ router.post(
   authMiddleware,
   adminMiddleware,
   async (req: AuthRequest, res: Response): Promise<void> => {
-    const { title, author, category, quantity } = req.body
+    const { title, author, category, quantity, coverUrl } = req.body
 
     if (!title || !author || !category) {
       res.status(400).json({ error: 'Thiếu thông tin sách' })
@@ -31,7 +50,14 @@ router.post(
     }
 
     const qty = quantity || 1
-    const book = await db.addBook({ title, author, category, quantity: qty, available: qty })
+    const book = await db.addBook({
+      title,
+      author,
+      category,
+      quantity: qty,
+      available: qty,
+      coverUrl: coverUrl || '',
+    })
     res.status(201).json(book)
   }
 )
@@ -41,7 +67,7 @@ router.put(
   authMiddleware,
   adminMiddleware,
   async (req: AuthRequest, res: Response): Promise<void> => {
-    const { title, author, category, quantity, available } = req.body
+    const { title, author, category, quantity, available, coverUrl } = req.body
     const id = Number(req.params.id)
 
     const existing = await db.findBook(id)
@@ -56,6 +82,7 @@ router.put(
       category: category ?? existing.category,
       quantity: quantity ?? existing.quantity,
       available: available ?? existing.available,
+      coverUrl: coverUrl ?? existing.coverUrl,
     })
 
     res.json(updated)

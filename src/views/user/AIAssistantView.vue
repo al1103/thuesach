@@ -1,267 +1,222 @@
 <script setup lang="ts">
 /**
  * @component AIAssistantView
- * @description AI chat assistant for borrow purpose-based book recommendations.
+ * @description User AI assistant view for book recommendations and library help.
  */
-import { computed, ref } from 'vue'
-import { useLibraryStore, type Book } from '@/stores/library'
-import { getBorrowAssistantResponse, type BookRecommendation } from '@/utils/aiBorrowAssistant'
+import { ref, onMounted, nextTick } from 'vue'
+import { useLibraryStore } from '@/stores/library'
 
 defineOptions({
   name: 'AIAssistantView',
 })
 
-type MessageRole = 'assistant' | 'user'
-
-interface ChatMessage {
-  id: number
-  role: MessageRole
-  content: string
-  recommendations?: BookRecommendation[]
-}
-
 const store = useLibraryStore()
-const message = ref<string>('')
-const messages = ref<ChatMessage[]>([
-  {
-    id: 1,
-    role: 'assistant',
-    content:
-      'Chào bạn, mình là AI hỗ trợ mượn sách. Hãy nói mục đích mượn, mình sẽ gợi ý sách phù hợp nhất.',
-  },
+const userInput = ref('')
+const chatContainer = ref<HTMLElement | null>(null)
+const messages = ref<{ role: 'user' | 'ai'; content: string }[]>([
+  { role: 'ai', content: 'Chào bạn! Tôi là trợ lý AI của thư viện. Tôi có thể giúp bạn tìm sách, gợi ý các tựa sách hay hoặc trả lời các câu hỏi về quy định mượn trả. Bạn muốn tìm hiểu gì hôm nay?' }
 ])
 
-const quickPrompts = [
-  'Mình cần sách để cải thiện kỹ năng giao tiếp',
-  'Gợi ý sách đọc thư giãn cuối tuần',
-  'Mình muốn mượn sách phục vụ học tập',
-]
+const isTyping = ref(false)
 
-const currentMember = computed(() => {
-  if (!store.currentUser?.memberId) return null
-  return store.getMember(store.currentUser.memberId)
+onMounted(async () => {
+  await store.fetchBooks()
 })
 
-const isBlocked = computed(() => {
-  if (!currentMember.value) return false
-  return store.isMemberBlacklisted(currentMember.value.id)
-})
-
-function submitPrompt(): void {
-  const content = message.value.trim()
-  if (!content) return
-
-  messages.value.push({
-    id: Date.now(),
-    role: 'user',
-    content,
-  })
-
-  const response = getBorrowAssistantResponse(content, store.books)
-  messages.value.push({
-    id: Date.now() + 1,
-    role: 'assistant',
-    content: response.answer,
-    recommendations: response.recommendations,
-  })
-  message.value = ''
-}
-
-function applyQuickPrompt(prompt: string): void {
-  message.value = prompt
-  submitPrompt()
-}
-
-function hasPendingRequest(bookId: number): boolean {
-  return store.requests.some(
-    request => request.bookId === bookId && request.userId === store.currentUser?.id && request.status === 'pending',
-  )
-}
-
-function requestBook(bookId: number, title: string): void {
-  if (isBlocked.value) {
-    store.showToast('Tài khoản đang bị khóa mượn sách', 'error')
-    return
+const scrollToBottom = async () => {
+  await nextTick()
+  if (chatContainer.value) {
+    chatContainer.value.scrollTop = chatContainer.value.scrollHeight
   }
-  if (hasPendingRequest(bookId)) {
-    store.showToast('Sách này đang có yêu cầu chờ duyệt', 'warning')
-    return
-  }
-  const result = store.addRequest(bookId, 'Yêu cầu từ AI Assistant')
-  if (!result) {
-    store.showToast('Không thể gửi yêu cầu mượn', 'error')
-    return
-  }
-  store.showToast(`Đã gửi yêu cầu mượn "${title}"`)
 }
 
-function getBookById(bookId: number): Book | undefined {
-  return store.getBook(bookId)
+const sendMessage = async () => {
+  if (!userInput.value.trim() || isTyping.value) return
+
+  const userMsg = userInput.value.trim()
+  messages.value.push({ role: 'user', content: userMsg })
+  userInput.value = ''
+  isTyping.value = true
+  
+  await scrollToBottom()
+
+  try {
+    // Basic AI logic for now - can be expanded to call actual AI API
+    setTimeout(async () => {
+      let aiResponse = ''
+      const lowerMsg = userMsg.toLowerCase()
+
+      if (lowerMsg.includes('gợi ý') || lowerMsg.includes('tìm sách') || lowerMsg.includes('hay')) {
+        const randomBooks = [...store.books].sort(() => 0.5 - Math.random()).slice(0, 2)
+        if (randomBooks.length > 0) {
+          aiResponse = `Tôi gợi ý cho bạn 2 cuốn sách này: "${randomBooks[0].title}" của ${randomBooks[0].author} và "${randomBooks[1].title}" của ${randomBooks[1].author}. Bạn thấy sao?`
+        } else {
+          aiResponse = 'Hiện tại thư viện đang cập nhật danh mục, bạn quay lại sau nhé!'
+        }
+      } else if (lowerMsg.includes('quy định') || lowerMsg.includes('hạn')) {
+        aiResponse = 'Quy định của thư viện là mượn tối đa 3 tháng. Nếu quá hạn sẽ bị phạt 5.000đ/ngày bạn nhé.'
+      } else {
+        aiResponse = 'Cảm ơn bạn đã chia sẻ. Tôi có thể giúp bạn tìm sách theo thể loại hoặc tác giả mà bạn yêu thích đấy!'
+      }
+
+      messages.value.push({ role: 'ai', content: aiResponse })
+      isTyping.value = false
+      await scrollToBottom()
+    }, 1000)
+  } catch (error) {
+    messages.value.push({ role: 'ai', content: 'Xin lỗi, tôi đang gặp một chút trục trặc kỹ thuật. Thử lại sau nhé!' })
+    isTyping.value = false
+    await scrollToBottom()
+  }
 }
 </script>
 
 <template>
-  <div class="ai-assistant">
-    <div class="card intro-card">
-      <h3>🤖 AI Tư Vấn Mượn Sách</h3>
-      <p class="text-muted">Nói mục đích mượn sách để nhận gợi ý phù hợp nhất theo nhu cầu.</p>
-      <div v-if="isBlocked && currentMember" class="badge badge-danger">
-        Tài khoản đang blacklist tới {{ currentMember.blacklistUntil || 'không thời hạn' }}
-      </div>
-    </div>
-
-    <div class="quick-prompts">
-      <button
-        v-for="prompt in quickPrompts"
-        :key="prompt"
-        class="btn btn-secondary btn-sm"
-        @click="applyQuickPrompt(prompt)"
-      >
-        {{ prompt }}
-      </button>
-    </div>
-
-    <div class="card chat-card">
-      <div class="chat-log">
-        <div v-for="item in messages" :key="item.id" class="chat-row" :class="item.role">
-          <div class="bubble">
-            <p>{{ item.content }}</p>
-            <div v-if="item.recommendations?.length" class="recommendations">
-              <div v-for="book in item.recommendations" :key="book.id" class="recommend-card">
-                <div>
-                  <strong>{{ book.title }}</strong>
-                  <div class="text-muted">{{ book.author }} • {{ book.category }}</div>
-                  <div class="text-muted">{{ book.reason }}</div>
-                </div>
-                <div class="recommend-actions">
-                  <span class="badge badge-info">
-                    Còn {{ getBookById(book.id)?.available || 0 }} cuốn
-                  </span>
-                  <button
-                    class="btn btn-primary btn-sm"
-                    :disabled="hasPendingRequest(book.id) || isBlocked"
-                    @click="requestBook(book.id, book.title)"
-                  >
-                    {{ hasPendingRequest(book.id) ? 'Đang chờ duyệt' : 'Yêu cầu mượn' }}
-                  </button>
-                </div>
-              </div>
-            </div>
+  <div class="ai-assistant-view">
+    <div class="chat-wrapper card">
+      <div class="chat-header">
+        <div class="flex items-center gap-3">
+          <div class="ai-avatar">
+            <i class="bi bi-robot"></i>
+          </div>
+          <div>
+            <h3 class="card-title mb-0">Trợ lý Thư viện AI</h3>
+            <span class="text-success" style="font-size: 0.75rem">● Đang trực tuyến</span>
           </div>
         </div>
       </div>
 
-      <form class="chat-input" @submit.prevent="submitPrompt">
-        <input
-          v-model="message"
-          type="text"
-          class="search-input"
-          placeholder="Ví dụ: Mình muốn mượn sách để học kỹ năng thuyết trình..."
-        />
-        <button type="submit" class="btn btn-primary">Gửi</button>
-      </form>
+      <div ref="chatContainer" class="chat-body">
+        <div v-for="(msg, index) in messages" :key="index" class="message-row" :class="msg.role">
+          <div class="message-bubble">
+            {{ msg.content }}
+          </div>
+        </div>
+        <div v-if="isTyping" class="message-row ai">
+          <div class="message-bubble typing">
+            <span class="dot"></span>
+            <span class="dot"></span>
+            <span class="dot"></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="chat-footer">
+        <form @submit.prevent="sendMessage" class="flex gap-2">
+          <input 
+            v-model="userInput" 
+            type="text" 
+            class="form-control" 
+            placeholder="Hỏi AI về sách, quy định..." 
+            :disabled="isTyping"
+          />
+          <button type="submit" class="btn btn-primary" :disabled="!userInput.trim() || isTyping">
+            <i class="bi bi-send"></i>
+          </button>
+        </form>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
-.ai-assistant {
+.ai-assistant-view {
+  height: calc(100vh - 160px);
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.chat-wrapper {
+  height: 100%;
   display: flex;
   flex-direction: column;
-  gap: var(--space-md);
+  padding: 0 !important;
+  overflow: hidden;
 }
 
-.intro-card h3 {
-  margin-bottom: 6px;
+.chat-header {
+  padding: var(--space-4) var(--space-6);
+  border-bottom: 1px solid var(--border-light);
+  background: white;
 }
 
-.quick-prompts {
+.ai-avatar {
+  width: 40px;
+  height: 40px;
+  background: var(--primary-light);
+  color: var(--primary);
+  border-radius: var(--radius-md);
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.chat-card {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-md);
-  min-height: 520px;
-}
-
-.chat-log {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  max-height: 520px;
-  overflow-y: auto;
-  padding-right: 4px;
-}
-
-.chat-row {
-  display: flex;
-}
-
-.chat-row.user {
-  justify-content: flex-end;
-}
-
-.chat-row.assistant {
-  justify-content: flex-start;
-}
-
-.bubble {
-  max-width: 86%;
-  border-radius: 14px;
-  padding: 12px;
-  border: 1px solid var(--border);
-  background: var(--bg-surface);
-}
-
-.chat-row.user .bubble {
-  background: var(--brand-50);
-  border-color: var(--brand-100);
-}
-
-.recommendations {
-  margin-top: 10px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.recommend-card {
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 10px;
-  background: var(--bg-surface-soft);
-}
-
-.recommend-actions {
-  margin-top: 8px;
-  display: flex;
-  justify-content: space-between;
   align-items: center;
-  gap: 8px;
+  justify-content: center;
+  font-size: 1.25rem;
 }
 
-.chat-input {
+.chat-body {
+  flex: 1;
+  padding: var(--space-6);
+  overflow-y: auto;
   display: flex;
-  gap: 10px;
+  flex-direction: column;
+  gap: var(--space-4);
+  background-color: var(--bg-app);
 }
 
-@media (max-width: 768px) {
-  .bubble {
-    max-width: 100%;
-  }
+.message-row {
+  display: flex;
+  width: 100%;
+}
 
-  .recommend-actions {
-    flex-direction: column;
-    align-items: stretch;
-  }
+.message-row.ai { justify-content: flex-start; }
+.message-row.user { justify-content: flex-end; }
 
-  .chat-input {
-    flex-direction: column;
-  }
+.message-bubble {
+  max-width: 80%;
+  padding: 12px 16px;
+  border-radius: var(--radius-lg);
+  font-size: 0.9375rem;
+  line-height: 1.5;
+}
+
+.ai .message-bubble {
+  background: white;
+  color: var(--text-main);
+  border: 1px solid var(--border-light);
+  border-bottom-left-radius: 4px;
+}
+
+.user .message-bubble {
+  background: var(--primary);
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.chat-footer {
+  padding: var(--space-4) var(--space-6);
+  background: white;
+  border-top: 1px solid var(--border-light);
+}
+
+.mb-0 { margin-bottom: 0 !important; }
+
+/* Typing animation */
+.typing {
+  display: flex;
+  gap: 4px;
+  padding: 12px 20px;
+}
+.dot {
+  width: 6px;
+  height: 6px;
+  background: var(--text-subtle);
+  border-radius: 50%;
+  animation: bounce 1.4s infinite ease-in-out;
+}
+.dot:nth-child(1) { animation-delay: -0.32s; }
+.dot:nth-child(2) { animation-delay: -0.16s; }
+
+@keyframes bounce {
+  0%, 80%, 100% { transform: scale(0); }
+  40% { transform: scale(1.0); }
 }
 </style>

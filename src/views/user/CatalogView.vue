@@ -1,9 +1,9 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 /**
  * @component CatalogView
- * @description User catalog view to browse books and create borrow requests.
+ * @description User catalog view with professional SaaS aesthetics.
  */
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted } from 'vue'
 import { useLibraryStore } from '@/stores/library'
 
 defineOptions({
@@ -11,6 +11,13 @@ defineOptions({
 })
 
 const store = useLibraryStore()
+
+onMounted(async () => {
+  await Promise.all([
+    store.fetchBooks(),
+    store.fetchRequests(),
+  ])
+})
 
 const searchQuery = ref<string>('')
 const showRequestModal = ref<boolean>(false)
@@ -34,8 +41,7 @@ const selectedBook = computed(() => {
 })
 
 const currentMember = computed(() => {
-  if (!store.currentUser?.memberId) return null
-  return store.getMember(store.currentUser.memberId)
+  return store.currentUser?.member || null
 })
 
 const isBlocked = computed(() => {
@@ -59,89 +65,113 @@ function openRequestModal(bookId: number): void {
   showRequestModal.value = true
 }
 
-function handleRequest(): void {
+async function handleRequest(): Promise<void> {
   if (!selectedBookId.value) return
-  const result = store.addRequest(selectedBookId.value, requestNote.value)
-  if (!result) {
-    store.showToast('Không thể gửi yêu cầu mượn', 'error')
-    return
+  const result = await store.addRequest(selectedBookId.value, requestNote.value)
+  if (result) {
+    showRequestModal.value = false
   }
-  store.showToast('Đã gửi yêu cầu mượn sách')
-  showRequestModal.value = false
 }
 </script>
 
 <template>
   <div class="catalog-view">
-    <div v-if="isBlocked && currentMember" class="card" style="margin-bottom: 12px">
-      <strong>⚠️ Tài khoản đang bị blacklist</strong>
-      <p class="text-muted" style="margin-top: 6px">
-        Bạn bị khóa mượn đến {{ currentMember.blacklistUntil || 'không thời hạn' }}.
-        {{ currentMember.blacklistReason || '' }}
-      </p>
+    <!-- Blocked Alert -->
+    <div v-if="isBlocked && currentMember" class="alert alert-danger mb-6">
+      <i class="bi bi-slash-circle-fill"></i>
+      <div>
+        <strong>Tài khoản đang bị khóa mượn sách</strong>
+        <p class="mb-0" style="font-size: 0.8125rem">
+          Khóa đến {{ currentMember.blacklistUntil || 'không thời hạn' }}. Lý do: {{ currentMember.blacklistReason || 'Vi phạm nội quy' }}
+        </p>
+      </div>
     </div>
 
-    <div class="search-box">
-      <input
-        v-model="searchQuery"
-        type="text"
-        class="search-input"
-        placeholder="🔍 Tìm kiếm sách theo tên, tác giả, thể loại..."
-      />
+    <!-- Toolbar -->
+    <div class="flex justify-between items-center mb-8">
+      <div class="search-bar">
+        <i class="bi bi-search"></i>
+        <input v-model="searchQuery" type="text" placeholder="Tìm kiếm sách, tác giả, thể loại..." style="width: 400px;" />
+      </div>
     </div>
 
-    <div class="book-grid">
-      <div v-for="book in filteredBooks" :key="book.id" class="book-card">
-        <div class="book-cover">📖</div>
-        <div class="book-info">
-          <h4>{{ book.title }}</h4>
-          <p>{{ book.author }}</p>
-          <p>{{ book.category }}</p>
-          <div class="book-availability" :class="book.available > 0 ? 'available' : 'unavailable'">
-            {{ book.available > 0 ? `Còn ${book.available} cuốn` : 'Hết sách' }}
+    <!-- Book Grid -->
+    <div v-if="filteredBooks.length" class="book-grid-container">
+      <div v-for="book in filteredBooks" :key="book.id" class="catalog-card">
+        <div class="catalog-card-cover">
+          <img v-if="book.coverUrl" :src="book.coverUrl" :alt="book.title" />
+          <div v-else class="no-cover">
+            <i class="bi bi-book"></i>
           </div>
-          <button
-            v-if="book.available > 0 && !hasExistingRequest(book.id)"
-            class="btn btn-primary btn-sm"
-            style="width: 100%; margin-top: 12px"
-            :disabled="isBlocked"
-            @click="openRequestModal(book.id)"
-          >
-            📨 Yêu cầu mượn
-          </button>
-          <button
-            v-else-if="hasExistingRequest(book.id)"
-            class="btn btn-secondary btn-sm"
-            style="width: 100%; margin-top: 12px"
-            disabled
-          >
-            ⏳ Đang chờ duyệt
-          </button>
+          <div class="catalog-card-badge" :class="book.available > 0 ? 'available' : 'unavailable'">
+            {{ book.available > 0 ? 'Sẵn có' : 'Hết sách' }}
+          </div>
+        </div>
+        
+        <div class="catalog-card-body">
+          <div class="category-tag">{{ book.category }}</div>
+          <h4 class="book-title">{{ book.title }}</h4>
+          <p class="book-author">{{ book.author }}</p>
+          
+          <div class="flex justify-between items-center mt-auto pt-4">
+            <span class="stock-info">Còn {{ book.available }} cuốn</span>
+            
+            <button
+              v-if="book.available > 0 && !hasExistingRequest(book.id)"
+              class="btn btn-primary btn-sm"
+              :disabled="isBlocked"
+              @click="openRequestModal(book.id)"
+            >
+              <i class="bi bi-plus-lg"></i> Mượn sách
+            </button>
+            <button
+              v-else-if="hasExistingRequest(book.id)"
+              class="btn btn-outline btn-sm"
+              disabled
+            >
+              <i class="bi bi-clock"></i> Chờ duyệt
+            </button>
+          </div>
         </div>
       </div>
     </div>
 
-    <div v-if="!filteredBooks.length" class="empty-state">
-      <div class="icon">📚</div>
-      <p>Không tìm thấy sách nào</p>
+    <div v-else class="empty-state">
+      <i class="bi bi-journal-x empty-icon"></i>
+      <h3 class="empty-title">Không tìm thấy sách</h3>
+      <p class="empty-text">Hãy thử tìm kiếm với từ khóa khác.</p>
     </div>
 
+    <!-- Request Modal -->
     <div v-if="showRequestModal" class="modal-overlay" @click.self="showRequestModal = false">
-      <div class="modal">
+      <div class="modal-content">
         <div class="modal-header">
-          <h3>Yêu cầu mượn sách</h3>
-          <button class="modal-close" @click="showRequestModal = false">&times;</button>
+          <h3 class="card-title">Gửi yêu cầu mượn sách</h3>
+          <button class="btn btn-ghost btn-sm" @click="showRequestModal = false">
+            <i class="bi bi-x-lg"></i>
+          </button>
         </div>
-        <div v-if="selectedBook" class="request-book-info">
-          <p><strong>Sách:</strong> {{ selectedBook.title }}</p>
-          <p><strong>Tác giả:</strong> {{ selectedBook.author }}</p>
-        </div>
+        
         <form @submit.prevent="handleRequest">
-          <div class="form-group">
-            <label>Ghi chú (tùy chọn)</label>
-            <textarea v-model="requestNote" placeholder="Nhập lý do mượn sách..." rows="3"></textarea>
+          <div class="modal-body">
+            <div v-if="selectedBook" class="flex gap-4 mb-6 p-4 bg-app rounded">
+              <img v-if="selectedBook.coverUrl" :src="selectedBook.coverUrl" style="width: 60px; height: 80px; object-fit: cover; border-radius: 4px;" />
+              <div class="flex flex-column justify-center">
+                <span class="font-bold text-main">{{ selectedBook.title }}</span>
+                <span class="text-subtle" style="font-size: 0.8125rem">{{ selectedBook.author }}</span>
+              </div>
+            </div>
+            
+            <div class="form-group">
+              <label class="form-label">Ghi chú cho quản thư</label>
+              <textarea v-model="requestNote" class="form-control" placeholder="Nhập lý do hoặc lời nhắn (tùy chọn)..." rows="3"></textarea>
+            </div>
           </div>
-          <button type="submit" class="btn btn-primary" style="width: 100%">Gửi yêu cầu</button>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-outline" @click="showRequestModal = false">Hủy</button>
+            <button type="submit" class="btn btn-primary">Gửi yêu cầu</button>
+          </div>
         </form>
       </div>
     </div>
@@ -149,16 +179,110 @@ function handleRequest(): void {
 </template>
 
 <style scoped>
-.request-book-info {
-  padding: var(--space-md);
-  background: var(--bg-surface-soft);
-  border-radius: var(--radius-md);
-  margin-bottom: var(--space-lg);
-  border: 1px solid var(--border);
+.book-grid-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: var(--space-8);
 }
 
-.request-book-info p {
-  font-size: 0.875rem;
-  margin-bottom: var(--space-xs);
+.catalog-card {
+  background: white;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-light);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  transition: all 0.2s;
 }
+
+.catalog-card:hover {
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-lg);
+}
+
+.catalog-card-cover {
+  height: 200px;
+  position: relative;
+  background-color: var(--bg-app);
+}
+
+.catalog-card-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.no-cover {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 3rem;
+  color: var(--text-subtle);
+}
+
+.catalog-card-badge {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  backdrop-filter: blur(8px);
+}
+
+.catalog-card-badge.available {
+  background: rgba(16, 185, 129, 0.9);
+  color: white;
+}
+
+.catalog-card-badge.unavailable {
+  background: rgba(239, 68, 68, 0.9);
+  color: white;
+}
+
+.catalog-card-body {
+  padding: var(--space-5);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.category-tag {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--primary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: var(--space-2);
+}
+
+.book-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-main);
+  margin-bottom: var(--space-1);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.book-author {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin-bottom: var(--space-4);
+}
+
+.stock-info {
+  font-size: 0.8125rem;
+  color: var(--text-subtle);
+  font-weight: 500;
+}
+
+.font-bold { font-weight: 700; }
+.flex-column { flex-direction: column; }
+.justify-center { justify-content: center; }
+.rounded { border-radius: var(--radius-md); }
 </style>
