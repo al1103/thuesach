@@ -12,6 +12,7 @@ import rentalsRoutes from './routes/rentals'
 import requestsRoutes from './routes/requests'
 import extensionsRoutes from './routes/extensions'
 import statsRoutes from './routes/stats'
+import { overdueMiddleware } from './middleware/overdue'
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -24,6 +25,8 @@ app.use(
   })
 )
 app.use(express.json())
+app.use(overdueMiddleware)
+
 
 app.use('/api/auth', authRoutes)
 app.use('/api/books', booksRoutes)
